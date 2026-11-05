@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dangubi-root
+  namespace: argocd
+spec:
+  description: Argo CD 네임스페이스에 DangUBI 하위 Application 등록
+  sourceRepos:
+    - https://github.com/pika-chew/DangUBI_GitOps.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: argoproj.io
+      kind: Application
