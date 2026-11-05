@@ -32,9 +32,5 @@ spec:
       kind: ClusterRoleBinding
 
   namespaceResourceWhitelist:
-    # 같은 프로젝트에 MySQL·MongoDB(StatefulSet, Service, PVC 등)도 들어오므로 kind를 하나씩 나열하지 않고 전체를 허용한다.
-    # Strimzi chart의 Deployment·ServiceAccount·ConfigMap·RoleBinding·NetworkPolicy·PodDisruptionBudget,
-    # kafka.strimzi.io CR, ExternalSecret이 모두 여기에 포함된다.
-    # 네임스페이스는 위 destinations에서 ubi-data로 제한되므로 범위가 넓어지지 않는다.
     - group: "*"
       kind: "*"
