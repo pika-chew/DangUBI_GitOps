@@ -10,7 +10,7 @@ spec:
 
   sourceRepos:
     # GitOps 저장소. 주소가 확정되면 교체한다.
-    - CHANGE_ME
+    - https://github.com/pika-chew/DangUBI_GitOps.git
     # Strimzi 오퍼레이터 Helm chart 저장소. apps/data/kafka.yaml이 이 저장소의 chart를 직접 끌어오므로 허용해야 한다.
     # Application의 repoURL과 문자열이 정확히 같아야 매칭되므로 끝의 '/'까지 맞춘다.
     - https://strimzi.io/charts/
