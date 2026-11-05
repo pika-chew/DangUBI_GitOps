@@ -1,0 +1,40 @@
+# AppProject "data"
+# ubi-data 네임스페이스의 데이터 계층(MySQL, MongoDB, Kafka, Kafka Connect) Application이 속하는 프로젝트.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: data
+  namespace: argocd
+spec:
+  description: UBI 데이터 계층 (MySQL, MongoDB, Strimzi Kafka, Kafka Connect)
+
+  sourceRepos:
+    # GitOps 저장소. 주소가 확정되면 교체한다.
+    - CHANGE_ME
+    # Strimzi 오퍼레이터 Helm chart 저장소. apps/data/kafka.yaml이 이 저장소의 chart를 직접 끌어오므로 허용해야 한다.
+    # Application의 repoURL과 문자열이 정확히 같아야 매칭되므로 끝의 '/'까지 맞춘다.
+    - https://strimzi.io/charts/
+
+  destinations:
+    # Strimzi 오퍼레이터, Kafka, Kafka Connect, MySQL, MongoDB가 모두 ubi-data에 배포된다.
+    - server: https://kubernetes.default.svc
+      namespace: ubi-data
+
+  clusterResourceWhitelist:
+    # Strimzi chart가 Kafka, KafkaNodePool, KafkaTopic, KafkaConnect, KafkaConnector 등의 CRD를 설치한다.
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    # 오퍼레이터가 여러 네임스페이스의 리소스와 노드 정보(랙 인식)를 다루기 위해 chart가 ClusterRole을 만든다.
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    # 위 ClusterRole을 오퍼레이터 ServiceAccount에 묶는 바인딩도 클러스터 범위다.
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+
+  namespaceResourceWhitelist:
+    # 같은 프로젝트에 MySQL·MongoDB(StatefulSet, Service, PVC 등)도 들어오므로 kind를 하나씩 나열하지 않고 전체를 허용한다.
+    # Strimzi chart의 Deployment·ServiceAccount·ConfigMap·RoleBinding·NetworkPolicy·PodDisruptionBudget,
+    # kafka.strimzi.io CR, ExternalSecret이 모두 여기에 포함된다.
+    # 네임스페이스는 위 destinations에서 ubi-data로 제한되므로 범위가 넓어지지 않는다.
+    - group: "*"
+      kind: "*"
