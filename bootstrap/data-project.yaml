@@ -1,16 +1,40 @@
+# AppProject "dangubi-data"
+# dangubi-data 네임스페이스의 데이터 계층(MySQL, MongoDB, Kafka, Kafka Connect) Application이 속하는 프로젝트.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: dangubi-data
   namespace: argocd
 spec:
-  description: MySQL, MongoDB, Kafka와 Kafka Connect 배포
+  description: UBI 데이터 계층 (MySQL, MongoDB, Strimzi Kafka, Kafka Connect)
+
   sourceRepos:
+    # GitOps 저장소. 주소가 확정되면 교체한다.
     - https://github.com/pika-chew/DangUBI_GitOps.git
+    # Strimzi 오퍼레이터 Helm chart 저장소. apps/data/kafka.yaml이 이 저장소의 chart를 직접 끌어오므로 허용해야 한다.
+    # Application의 repoURL과 문자열이 정확히 같아야 매칭되므로 끝의 '/'까지 맞춘다.
+    - https://strimzi.io/charts/
+
   destinations:
+    # Strimzi 오퍼레이터, Kafka, Kafka Connect, MySQL, MongoDB가 모두 dangubi-data에 배포된다.
     - server: https://kubernetes.default.svc
       namespace: dangubi-data
-  clusterResourceWhitelist: []
+
+  clusterResourceWhitelist:
+    # Strimzi chart가 Kafka, KafkaNodePool, KafkaTopic, KafkaConnect, KafkaConnector 등의 CRD를 설치한다.
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    # 오퍼레이터가 여러 네임스페이스의 리소스와 노드 정보(랙 인식)를 다루기 위해 chart가 ClusterRole을 만든다.
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    # 위 ClusterRole을 오퍼레이터 ServiceAccount에 묶는 바인딩도 클러스터 범위다.
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+      
   namespaceResourceBlacklist:
     - group: ""
       kind: ResourceQuota
