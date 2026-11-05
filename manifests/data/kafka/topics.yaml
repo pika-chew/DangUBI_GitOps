@@ -7,7 +7,7 @@ kind: KafkaTopic
 metadata:
   name: outbox.vehicle-summary
   labels:
-    strimzi.io/cluster: ubi-kafka
+    strimzi.io/cluster: dangubi-kafka
   annotations:
     # Kafka 클러스터(wave 1)가 Ready가 된 뒤에 만든다.
     argocd.argoproj.io/sync-wave: "2"
@@ -26,7 +26,7 @@ kind: KafkaTopic
 metadata:
   name: outbox.trip-score
   labels:
-    strimzi.io/cluster: ubi-kafka
+    strimzi.io/cluster: dangubi-kafka
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
@@ -42,7 +42,7 @@ kind: KafkaTopic
 metadata:
   name: outbox.monthly-premium
   labels:
-    strimzi.io/cluster: ubi-kafka
+    strimzi.io/cluster: dangubi-kafka
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
@@ -59,7 +59,7 @@ kind: KafkaTopic
 metadata:
   name: ubi.mongo-sink.dlq
   labels:
-    strimzi.io/cluster: ubi-kafka
+    strimzi.io/cluster: dangubi-kafka
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
@@ -75,7 +75,7 @@ kind: KafkaTopic
 metadata:
   name: ubi.schema-history
   labels:
-    strimzi.io/cluster: ubi-kafka
+    strimzi.io/cluster: dangubi-kafka
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:

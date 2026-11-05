@@ -13,7 +13,7 @@ spec:
   version: 4.3.1
   # 1대가 죽으면 남은 워커로 태스크가 재배정된다.
   replicas: 2
-  bootstrapServers: ubi-kafka-kafka-bootstrap:9092
+  bootstrapServers: dangubi-kafka-kafka-bootstrap:9092
 
   # Connect 클러스터 식별자와 내부 토픽. Strimzi v1에서는 spec.config가 아니라 여기 필수 필드로 쓴다.
   groupId: ubi-connect

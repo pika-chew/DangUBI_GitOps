@@ -39,7 +39,7 @@ spec:
     tombstones.on.delete: false
 
     # 커넥터 재시작 때 스키마를 복원하는 DDL 이력 저장소.
-    schema.history.internal.kafka.bootstrap.servers: ubi-kafka-kafka-bootstrap:9092
+    schema.history.internal.kafka.bootstrap.servers: dangubi-kafka-kafka-bootstrap:9092
     schema.history.internal.kafka.topic: ubi.schema-history
     # 구독하는 테이블(outbox)의 DDL만 저장해 이력을 작게 유지한다.
     schema.history.internal.store.only.captured.tables.ddl: true

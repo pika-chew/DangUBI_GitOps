@@ -5,7 +5,7 @@ metadata:
   name: dual-role
   labels:
     # 이 풀이 어느 Kafka 클러스터에 속하는지 정한다. 아래 Kafka CR 이름과 반드시 같아야 한다.
-    strimzi.io/cluster: ubi-kafka
+    strimzi.io/cluster: dangubi-kafka
   annotations:
     # 앱 안에서 오퍼레이터 chart(wave 0)가 뜬 뒤에 적용한다.
     argocd.argoproj.io/sync-wave: "1"
@@ -50,7 +50,7 @@ spec:
           whenUnsatisfiable: DoNotSchedule
           labelSelector:
             matchLabels:
-              strimzi.io/cluster: ubi-kafka
+              strimzi.io/cluster: dangubi-kafka
               strimzi.io/kind: Kafka
 ---
 # Kafka: 클러스터 전체 설정. 브로커 파드 자체는 위 KafkaNodePool이 만든다.
@@ -58,7 +58,7 @@ spec:
 apiVersion: kafka.strimzi.io/v1
 kind: Kafka
 metadata:
-  name: ubi-kafka
+  name: dangubi-kafka
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
