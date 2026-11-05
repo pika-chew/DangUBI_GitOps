@@ -1,0 +1,11 @@
+# Kafka 클러스터(KafkaNodePool + Kafka)와 토픽(KafkaTopic).
+# apps/data/kafka.yaml의 두 번째 source가 이 경로를 동기화한다.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# AppProject dangubi-data가 허용하는 네임스페이스. Strimzi 오퍼레이터도 이 네임스페이스만 감시한다.
+namespace: dangubi-data
+
+resources:
+  - kafka.yaml
+  - topics.yaml

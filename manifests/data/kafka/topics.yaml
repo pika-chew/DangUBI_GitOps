@@ -1,0 +1,89 @@
+# 토픽 목록. auto.create.topics.enable=false이므로 여기 없는 토픽은 만들어지지 않는다.
+# 쿠버네티스 리소스 이름(metadata.name)에는 '_'를 쓸 수 없어 '-'로 바꾸고, 실제 토픽 이름은 spec.topicName에 둔다.
+# outbox 토픽 이름 규칙: "outbox." + outbox 테이블의 aggregatetype 값.
+# Debezium Event Router의 route.topic.replacement(outbox.${routedByValue})와 반드시 일치해야 한다.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: outbox.vehicle-summary
+  labels:
+    strimzi.io/cluster: ubi-kafka
+  annotations:
+    # Kafka 클러스터(wave 1)가 Ready가 된 뒤에 만든다.
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  topicName: outbox.vehicle_summary
+  # 키(vehicle_id) 기준으로 파티션이 정해져 차량별 순서가 보장된다. Sink tasksMax 3과 맞춘다.
+  partitions: 3
+  replicas: 3
+  config:
+    # 7일
+    retention.ms: 604800000
+    min.insync.replicas: 2
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: outbox.trip-score
+  labels:
+    strimzi.io/cluster: ubi-kafka
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  topicName: outbox.trip_score
+  partitions: 3
+  replicas: 3
+  config:
+    retention.ms: 604800000
+    min.insync.replicas: 2
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: outbox.monthly-premium
+  labels:
+    strimzi.io/cluster: ubi-kafka
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  topicName: outbox.monthly_premium
+  partitions: 3
+  replicas: 3
+  config:
+    retention.ms: 604800000
+    min.insync.replicas: 2
+---
+# Mongo Sink가 처리하지 못한 메시지를 보관하는 DLQ. 양이 적어 파티션 1개.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ubi.mongo-sink.dlq
+  labels:
+    strimzi.io/cluster: ubi-kafka
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    # 14일. 원인을 분석하고 재처리할 시간을 넉넉히 둔다.
+    retention.ms: 1209600000
+---
+# Debezium이 읽은 테이블의 DDL 이력. 커넥터가 재시작할 때 이 이력으로 스키마를 복원한다.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: ubi.schema-history
+  labels:
+    strimzi.io/cluster: ubi-kafka
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  # Debezium은 이력을 순서대로 읽어야 하므로 반드시 파티션 1개.
+  partitions: 1
+  replicas: 3
+  config:
+    # 무기한 보존. 이력이 지워지면 커넥터가 재시작에 실패한다.
+    retention.ms: -1
+    # compact는 같은 키의 이전 이력을 지울 수 있어 쓰지 않는다. retention -1과 함께 써서 아무것도 지우지 않는다.
+    cleanup.policy: delete

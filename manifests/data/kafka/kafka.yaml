@@ -1,0 +1,89 @@
+# KafkaNodePool: 브로커 파드의 개수·역할·디스크·배치를 정한다.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: dual-role
+  labels:
+    # 이 풀이 어느 Kafka 클러스터에 속하는지 정한다. 아래 Kafka CR 이름과 반드시 같아야 한다.
+    strimzi.io/cluster: ubi-kafka
+  annotations:
+    # 앱 안에서 오퍼레이터 chart(wave 0)가 뜬 뒤에 적용한다.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  # 물리 호스트 3대(cmp1, ctl1, ctl2)에 1대씩. RF3·KRaft 과반수(2/3)의 최소 단위다.
+  replicas: 3
+  # controller와 broker를 한 파드가 겸한다. 역할별로 나누면 파드가 6개가 되어 자원이 부족하다.
+  roles:
+    - controller
+    - broker
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        # 7일 보존이고 이벤트가 집계 결과라 작다. 10Gi면 충분하다.
+        size: 10Gi
+        # storage 담당이 만든 정적 local PV용 StorageClass. worker1·3·4에 PV가 1개씩 있다.
+        class: local-kafka
+        # CR을 지워도 PVC(데이터)는 남긴다. 실수로 지웠을 때 복구할 여지를 둔다.
+        deleteClaim: false
+        # KRaft 메타데이터 로그를 데이터와 같은 디스크에 둔다. 디스크가 하나뿐이다.
+        kraftMetadata: shared
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1536Mi
+    limits:
+      # 노트북 워커(8GB)에도 올라가야 해서 2Gi로 제한한다. CPU 상한은 두지 않는다(스로틀링 방지).
+      memory: 2Gi
+  jvmOptions:
+    # 힙은 메모리의 절반 이하로 둔다. 나머지는 Kafka 성능에 중요한 OS 페이지 캐시가 쓴다.
+    -Xms: 768m
+    -Xmx: 768m
+  template:
+    pod:
+      topologySpreadConstraints:
+        # worker1·2가 같은 PC(cmp1)에 있으므로 노드가 아니라 물리 호스트(ubi.io/host) 기준으로 1대씩 강제한다.
+        # 호스트 1대가 죽어도 브로커 2대가 남아 KRaft 과반수와 min ISR 2를 유지한다.
+        - maxSkew: 1
+          topologyKey: ubi.io/host
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              strimzi.io/cluster: ubi-kafka
+              strimzi.io/kind: Kafka
+---
+# Kafka: 클러스터 전체 설정. 브로커 파드 자체는 위 KafkaNodePool이 만든다.
+# Strimzi 1.x는 KRaft·노드 풀 전용이라 strimzi.io/node-pools, strimzi.io/kraft 주석이 필요 없다.
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: ubi-kafka
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  kafka:
+    # Strimzi 1.3.0이 지원하는 최신 버전. 4.3.2는 1.3.1부터 지원하므로, 올리려면 오퍼레이터를 먼저 올린다.
+    version: 4.3.1
+    listeners:
+      # 클러스터 내부 전용 평문 리스너. Connect와 Debezium만 접속한다. TLS+인증은 개선안으로 남긴다.
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      # 토픽 기본 복제 3, 쓰기 성공 기준 2. 브로커 1대가 죽어도 읽기·쓰기가 계속된다.
+      default.replication.factor: 3
+      min.insync.replicas: 2
+      # 컨슈머 오프셋·트랜잭션 내부 토픽도 같은 기준으로 맞춘다.
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      # 오타 난 토픽이 자동으로 생기는 것을 막는다. 토픽은 KafkaTopic(topics.yaml)으로만 만든다.
+      auto.create.topics.enable: false
+      # 7일. 장애 후 재처리할 시간을 남긴다.
+      log.retention.hours: 168
+  entityOperator:
+    # KafkaTopic CR을 실제 토픽으로 만드는 Topic Operator만 켠다.
+    # KafkaUser를 쓰지 않으므로 User Operator는 생략해 자원을 아낀다.
+    topicOperator: {}
