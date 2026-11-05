@@ -26,7 +26,7 @@ spec:
           - $values/helm/kafka/values.yaml
 
     # source 2: GitOps 저장소. chart의 values 참조(ref)와 Kafka CR 매니페스트(path)를 함께 제공한다.
-    - repoURL: CHANGE_ME
+    - repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
       targetRevision: main
       ref: values
       path: manifests/data/kafka

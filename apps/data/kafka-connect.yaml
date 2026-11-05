@@ -13,7 +13,7 @@ spec:
   project: data
 
   source:
-    repoURL: CHANGE_ME
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
     targetRevision: main
     path: manifests/data/kafka-connect
 
