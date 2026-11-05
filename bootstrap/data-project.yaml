@@ -1,9 +1,9 @@
-# AppProject "data"
-# ubi-data 네임스페이스의 데이터 계층(MySQL, MongoDB, Kafka, Kafka Connect) Application이 속하는 프로젝트.
+# AppProject "dangubi-data"
+# dangubi-data 네임스페이스의 데이터 계층(MySQL, MongoDB, Kafka, Kafka Connect) Application이 속하는 프로젝트.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
-  name: data
+  name: dangubi-data
   namespace: argocd
 spec:
   description: UBI 데이터 계층 (MySQL, MongoDB, Strimzi Kafka, Kafka Connect)
@@ -16,9 +16,9 @@ spec:
     - https://strimzi.io/charts/
 
   destinations:
-    # Strimzi 오퍼레이터, Kafka, Kafka Connect, MySQL, MongoDB가 모두 ubi-data에 배포된다.
+    # Strimzi 오퍼레이터, Kafka, Kafka Connect, MySQL, MongoDB가 모두 dangubi-data에 배포된다.
     - server: https://kubernetes.default.svc
-      namespace: ubi-data
+      namespace: dangubi-data
 
   clusterResourceWhitelist:
     # Strimzi chart가 Kafka, KafkaNodePool, KafkaTopic, KafkaConnect, KafkaConnector 등의 CRD를 설치한다.

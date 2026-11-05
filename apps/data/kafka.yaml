@@ -10,7 +10,7 @@ metadata:
     # wave 2(kafka-connect)보다 먼저
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  project: data
+  project: dangubi-data
 
   sources:
     # source 1: Strimzi 오퍼레이터 chart. CRD, RBAC, 오퍼레이터 Deployment를 설치한다.
@@ -32,7 +32,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: ubi-data
+    namespace: dangubi-data
 
   syncPolicy:
     automated:
