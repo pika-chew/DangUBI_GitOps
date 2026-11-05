@@ -8,6 +8,7 @@ spec:
   sourceRepos:
     # 외부 chart를 도입할 때 해당 저장소 URL을 추가한다.
     - https://github.com/pika-chew/DangUBI_GitOps.git
+    - https://kubernetes.github.io/cloud-provider-openstack
   destinations:
     - server: https://kubernetes.default.svc
       namespace: kube-system

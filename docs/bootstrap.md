@@ -29,8 +29,9 @@ Argo CD 설치 단계에서는 `argocd`만 생성한다. 업무·데이터 및 �
 업무와 데이터 프로젝트는 클러스터 범위 리소스 및 ResourceQuota·LimitRange 변경을 허용하지 않는다.
 AppProject 이름에 `dangubi-`를 붙여 다른 프로젝트와 구분한다.
 
-현재 모든 프로젝트의 `sourceRepos`는 이 GitOps 레포만 허용한다.
-외부 Helm chart를 도입할 때 해당 프로젝트에 정확한 chart 저장소 URL을 추가한다.
+root·data·workloads 프로젝트는 이 GitOps 레포만 허용한다.
+infra 프로젝트는 Cinder CSI 설치를 위해 공식 OpenStack chart 저장소도 허용한다.
+외부 Helm chart를 추가로 도입할 때 해당 프로젝트에 정확한 chart 저장소 URL을 추가한다.
 Operator를 도입하면 컨트롤러·CRD는 infra에서, 클러스터 정의는 data에서 관리한다.
 Calico와 OpenStack CCM은 기존 Ansible에서 계속 관리한다.
 
@@ -165,6 +166,8 @@ kubectl get namespace dangubi dangubi-data metallb-system argo-rollouts
 kubectl -n dangubi-data describe resourcequota dangubi-data-compute
 kubectl -n dangubi describe resourcequota dangubi-workloads-compute
 ```
+
+다음 단계인 Cinder CSI와 공통 StorageClass의 구성·확인 절차는 [storage.md](storage.md)를 따른다.
 
 ## 변경과 삭제
 

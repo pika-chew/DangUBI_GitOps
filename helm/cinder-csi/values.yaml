@@ -1,0 +1,98 @@
+nameOverride: cinder-csi
+clusterID: dangubi
+
+# 인증 정보는 Git에 넣지 않고 미리 준비한 전용 Secret을 참조한다.
+secret:
+  enabled: true
+  create: false
+  hostMount: false
+  name: dangubi-cinder-cloud-config
+  filename: cloud.conf
+
+# StorageClass는 별도 Application에서 관리하며 chart의 Delete 클래스를 생성하지 않는다.
+storageClass:
+  enabled: false
+
+csi:
+  # Snapshot CRD와 공통 snapshot-controller는 해당 기능 도입 시 별도로 설치한다.
+  snapshotter:
+    enabled: false
+  attacher:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+  provisioner:
+    topology: "true"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+  resizer:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+  livenessprobe:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 64Mi
+  nodeDriverRegistrar:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 64Mi
+  plugin:
+    # 현재 사용하지 않는 CA 디렉터리를 hostPath로 생성하지 않는다.
+    volumes: []
+    volumeMounts:
+      - name: cloud-config
+        mountPath: /etc/config
+        readOnly: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+    controllerPlugin:
+      replicas: 2
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: cinder-csi
+                  component: controllerplugin
+                  release: cinder-csi
+              topologyKey: kubernetes.io/hostname
+    nodePlugin:
+      kubeletDir: /var/lib/kubelet
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
