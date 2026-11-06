@@ -1,7 +1,4 @@
-# 토픽 목록. auto.create.topics.enable=false이므로 여기 없는 토픽은 만들어지지 않는다.
-# 쿠버네티스 리소스 이름(metadata.name)에는 '_'를 쓸 수 없어 '-'로 바꾸고, 실제 토픽 이름은 spec.topicName에 둔다.
-# outbox 토픽 이름 규칙: "outbox." + outbox 테이블의 aggregatetype 값.
-# Debezium Event Router의 route.topic.replacement(outbox.${routedByValue})와 반드시 일치해야 한다.
+# Topic list. 여기 없는 토픽은 생성되지 않는다.(kafka.yaml의 Kafka 참고)
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
@@ -9,8 +6,9 @@ metadata:
   labels:
     strimzi.io/cluster: dangubi-kafka
   annotations:
-    # Kafka 클러스터(wave 1)가 Ready가 된 뒤에 만든다.
+    # 선 : Kafka 클러스터(wave 1) / 후 : Kafka Topic(wave 2)
     argocd.argoproj.io/sync-wave: "2"
+# Debezium Event Router와 반드시 일치해야 한다.(connector-debezium-outbox.yaml 참고)
 spec:
   topicName: outbox.vehicle_summary
   # 키(vehicle_id) 기준으로 파티션이 정해져 차량별 순서가 보장된다. Sink tasksMax 3과 맞춘다.
