@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-cinder-csi
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: dangubi-infra
+  sources:
+    - repoURL: https://kubernetes.github.io/cloud-provider-openstack
+      chart: openstack-cinder-csi
+      targetRevision: 2.36.5
+      helm:
+        releaseName: cinder-csi
+        valueFiles:
+          - $values/helm/cinder-csi/values.yaml
+    - repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      # 기존 볼륨의 연결·마운트에 필요한 드라이버를 자동 삭제하지 않는다.
+      prune: false
+      selfHeal: true

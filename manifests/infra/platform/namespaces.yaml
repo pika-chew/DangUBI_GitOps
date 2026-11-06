@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dangubi
+  labels:
+    app.kubernetes.io/part-of: dangubi
+  annotations:
+    # Namespace 삭제로 내부 리소스가 함께 삭제되는 것을 방지한다.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dangubi-data
+  labels:
+    app.kubernetes.io/part-of: dangubi
+  annotations:
+    # DB와 PVC의 보존 정책이 Namespace 삭제로 우회되지 않도록 한다.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metallb-system
+  labels:
+    app.kubernetes.io/part-of: dangubi
+    # Speaker의 호스트 네트워크와 네트워크 권한을 허용한다.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+  annotations:
+    # LoadBalancer Service가 사용하는 MetalLB의 Namespace를 보존한다.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argo-rollouts
+  labels:
+    app.kubernetes.io/part-of: dangubi
+  annotations:
+    # 배포 제어에 사용하는 컨트롤러의 Namespace를 보존한다.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
