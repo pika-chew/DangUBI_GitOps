@@ -12,7 +12,6 @@ metadata:
     argocd.argoproj.io/sync-wave: "3"
 spec:
   class: io.debezium.connector.mysql.MySqlConnector
-  # binlog는 하나의 순차 스트림이라 태스크를 늘려도 병렬화되지 않는다.
   tasksMax: 1
   autoRestart:
     # MySQL 재시작 같은 일시 장애로 커넥터가 FAILED가 되면 오퍼레이터가 자동으로 재시작한다.
@@ -25,17 +24,14 @@ spec:
     # 값은 Secret debezium-cred에서 읽는다(Vault → ExternalSecret).
     database.user: ${secrets:dangubi-data/debezium-cred:username}
     database.password: ${secrets:dangubi-data/debezium-cred:password}
-    # Debezium은 MySQL 복제 클라이언트로 붙는다. MySQL 서버들의 server_id와 겹치지 않는 값이어야 한다.
     database.server.id: 5401
     topic.prefix: dangubi
     database.include.list: ubi
-    # outbox 테이블만 구독한다. 점수 테이블 변경은 outbox 행으로만 내보낸다.
+    # 테이블 구독(only outbox). 변경 필요
     table.include.list: ubi.outbox
-    # 기존 행은 건너뛰고 현재 binlog 위치부터 읽는다. 과거분은 정합성 CronJob이 보정한다.
+    # 기존 행은 건너뛰고 현재 binlog 위치부터 읽는다. 과거분은 정합성 설계 X.
     snapshot.mode: no_data
-    # DDL 이벤트를 별도 토픽으로 내보내지 않는다.
     include.schema.changes: false
-    # 정리 Job이 처리된 outbox 행을 지워도 tombstone 메시지를 만들지 않는다.
     tombstones.on.delete: false
 
     # 커넥터 재시작 때 스키마를 복원하는 DDL 이력 저장소.
@@ -54,12 +50,9 @@ spec:
     transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
     # aggregatetype 컬럼 값으로 토픽을 나눈다.
     transforms.outbox.route.by.field: aggregatetype
-    # → outbox.vehicle_summary, outbox.trip_score, outbox.monthly_premium. topics.yaml의 토픽 이름과 일치해야 한다.
-    # (${routedByValue}는 콜론이 없어 Secret 참조로 해석되지 않는다.)
     transforms.outbox.route.topic.replacement: outbox.${routedByValue}
-    # 메시지 key = aggregateid(vehicle_id). 같은 차량은 같은 파티션으로 가서 순서가 보장된다.
+    # 같은 차량은 같은 파티션으로 가서 순서가 보장된다.
     transforms.outbox.table.field.event.key: aggregateid
-    # payload 컬럼의 JSON 문자열을 객체로 펼친다. Sink가 _id를 꺼낼 수 있어야 한다.
     transforms.outbox.table.expand.json.payload: true
     # type 컬럼은 본문이 아니라 헤더 eventType으로 보낸다.
     transforms.outbox.table.fields.additional.placement: type:header:eventType
