@@ -2,9 +2,9 @@
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaConnector
 metadata:
-  name: ubi-mongo-sink
+  name: dangubi-mongo-sink
   labels:
-    strimzi.io/cluster: ubi-connect
+    strimzi.io/cluster: dangubi-connect
   annotations:
     # KafkaConnect(wave 2)가 Ready가 된 뒤에 등록한다.
     argocd.argoproj.io/sync-wave: "3"
@@ -40,7 +40,7 @@ spec:
     # errors.tolerance는 변환 실패, mongo.errors.tolerance는 MongoDB 쓰기 실패에 적용된다.
     errors.tolerance: all
     mongo.errors.tolerance: all
-    errors.deadletterqueue.topic.name: ubi.mongo-sink.dlq
+    errors.deadletterqueue.topic.name: dangubi.mongo-sink.dlq
     errors.deadletterqueue.topic.replication.factor: 3
     # 실패 원인과 원본 토픽·offset을 DLQ 메시지 헤더에 기록해 원인 분석과 재처리에 쓴다.
     errors.deadletterqueue.context.headers.enable: true

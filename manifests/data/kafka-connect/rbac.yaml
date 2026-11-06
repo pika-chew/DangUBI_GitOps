@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: ubi-connect-secret-reader
+  name: dangubi-connect-secret-reader
   annotations:
     # Secret(wave 0) 다음, KafkaConnect(wave 2) 이전.
     argocd.argoproj.io/sync-wave: "1"
@@ -18,15 +18,15 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: ubi-connect-secret-reader
+  name: dangubi-connect-secret-reader
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: ubi-connect-secret-reader
+  name: dangubi-connect-secret-reader
 subjects:
   # Strimzi가 만드는 Connect 워커 ServiceAccount 이름은 "<KafkaConnect 이름>-connect"다.
   - kind: ServiceAccount
-    name: ubi-connect-connect
+    name: dangubi-connect-connect
     namespace: dangubi-data

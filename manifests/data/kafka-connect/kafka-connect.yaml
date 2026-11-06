@@ -2,7 +2,7 @@
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaConnect
 metadata:
-  name: ubi-connect
+  name: dangubi-connect
   annotations:
     # 커넥터를 REST API가 아니라 KafkaConnector CR로 관리한다. Git이 커넥터 설정의 원본이 된다.
     strimzi.io/use-connector-resources: "true"
@@ -16,11 +16,11 @@ spec:
   bootstrapServers: dangubi-kafka-kafka-bootstrap:9092
 
   # Connect 클러스터 식별자와 내부 토픽. Strimzi v1에서는 spec.config가 아니라 여기 필수 필드로 쓴다.
-  groupId: ubi-connect
-  configStorageTopic: ubi-connect-configs
+  groupId: dangubi-connect
+  configStorageTopic: dangubi-connect-configs
   # Source 커넥터의 binlog 위치(GTID)가 저장된다. 지워지면 Debezium이 어디부터 읽을지 잃어버린다.
-  offsetStorageTopic: ubi-connect-offsets
-  statusStorageTopic: ubi-connect-status
+  offsetStorageTopic: dangubi-connect-offsets
+  statusStorageTopic: dangubi-connect-status
 
   config:
     # 내부 토픽도 RF3으로 만든다. 브로커 1대 장애에도 오프셋·설정이 남는다.
@@ -55,7 +55,7 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              strimzi.io/cluster: ubi-connect
+              strimzi.io/cluster: dangubi-connect
               strimzi.io/kind: KafkaConnect
 
   # Strimzi가 플러그인을 넣은 Connect 이미지를 직접 빌드해 GHCR에 push하고, push된 digest로 pull한다.
@@ -63,7 +63,7 @@ spec:
     output:
       type: docker
       # GitHub 계정(조직)이 정해지면 교체한다.
-      image: ghcr.io/CHANGE_ME_GITHUB_OWNER/ubi-connect:latest
+      image: ghcr.io/CHANGE_ME_GITHUB_OWNER/dangubi-connect:latest
       pushSecret: ghcr-push
     plugins:
       - name: debezium-mysql
