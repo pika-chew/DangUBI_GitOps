@@ -1,0 +1,58 @@
+# Source 커넥터: MySQL outbox 테이블의 binlog를 읽어 outbox.<aggregatetype> 토픽으로 보낸다.
+# Command 앱은 점수 테이블과 outbox를 한 트랜잭션에 쓰기만 하고, Kafka 발행은 이 커넥터만 한다.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaConnector
+metadata:
+  name: dangubi-outbox-source
+  labels:
+    # 이 커넥터를 실행할 Connect 클러스터.
+    strimzi.io/cluster: dangubi-connect
+  annotations:
+    # KafkaConnect(wave 2)가 Ready가 된 뒤에 등록한다.
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  class: io.debezium.connector.mysql.MySqlConnector
+  tasksMax: 1
+  autoRestart:
+    # MySQL 재시작 같은 일시 장애로 커넥터가 FAILED가 되면 오퍼레이터가 자동으로 재시작한다.
+    enabled: true
+  config:
+    # MySQL Router의 읽기·쓰기(RW) 포트로 붙어 항상 primary의 binlog를 읽는다.
+    # 서비스 이름과 포트(X 프로토콜 포트가 아닌 RW 클래식 포트)는 MySQL 담당과 확인이 필요하다.
+    database.hostname: mysql-router.dangubi-data.svc.cluster.local
+    database.port: 3306
+    # 값은 Secret debezium-cred에서 읽는다(Vault → ExternalSecret).
+    database.user: ${secrets:dangubi-data/debezium-cred:username}
+    database.password: ${secrets:dangubi-data/debezium-cred:password}
+    database.server.id: 5401
+    topic.prefix: dangubi
+    database.include.list: ubi
+    # 테이블 구독(only outbox). 변경 필요
+    table.include.list: ubi.outbox
+    # 기존 행은 건너뛰고 현재 binlog 위치부터 읽는다. 과거분은 정합성 설계 X.
+    snapshot.mode: no_data
+    include.schema.changes: false
+    tombstones.on.delete: false
+
+    # 커넥터 재시작 때 스키마를 복원하는 DDL 이력 저장소.
+    schema.history.internal.kafka.bootstrap.servers: dangubi-kafka-kafka-bootstrap:9092
+    schema.history.internal.kafka.topic: dangubi.schema-history
+    # 구독하는 테이블(outbox)의 DDL만 저장해 이력을 작게 유지한다.
+    schema.history.internal.store.only.captured.tables.ddl: true
+
+    # key = vehicle_id 문자열, value = 스키마 없는 순수 JSON. Sink와 같은 설정이어야 한다.
+    key.converter: org.apache.kafka.connect.storage.StringConverter
+    value.converter: org.apache.kafka.connect.json.JsonConverter
+    value.converter.schemas.enable: false
+
+    # Outbox Event Router: outbox 행 하나를 업무 이벤트 메시지 하나로 바꾼다.
+    transforms: outbox
+    transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+    # aggregatetype 컬럼 값으로 토픽을 나눈다.
+    transforms.outbox.route.by.field: aggregatetype
+    transforms.outbox.route.topic.replacement: outbox.${routedByValue}
+    # 같은 차량은 같은 파티션으로 가서 순서가 보장된다.
+    transforms.outbox.table.field.event.key: aggregateid
+    transforms.outbox.table.expand.json.payload: true
+    # type 컬럼은 본문이 아니라 헤더 eventType으로 보낸다.
+    transforms.outbox.table.fields.additional.placement: type:header:eventType
