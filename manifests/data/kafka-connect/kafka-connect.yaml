@@ -49,9 +49,9 @@ spec:
       imagePullSecrets:
         - name: ghcr-push
       topologySpreadConstraints:
-        # 무상태라 반드시 나눌 필요는 없다. 가능하면 다른 물리 호스트에 두고, 안 되면 같은 호스트도 허용한다.
+        # 무상태라 반드시 나눌 필요는 없다. 가능하면 다른 노드에 두고, 안 되면 같은 노드도 허용한다.
         - maxSkew: 1
-          topologyKey: ubi.io/host
+          topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:

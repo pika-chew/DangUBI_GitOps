@@ -43,10 +43,10 @@ spec:
   template:
     pod:
       topologySpreadConstraints:
-        # worker1·2가 같은 PC(cmp1)에 있으므로 노드가 아니라 물리 호스트(ubi.io/host) 기준으로 1대씩 강제한다.
-        # 호스트 1대가 죽어도 브로커 2대가 남아 KRaft 과반수와 min ISR 2를 유지한다.
+        # 워커 VM이 물리 서버마다 1대씩이라, 노드 기준으로 나누면 곧 물리 서버 기준으로 나뉜다.
+        # 노드(=서버) 1대가 죽어도 브로커 2대가 남아 KRaft 과반수와 min ISR 2를 유지한다.
         - maxSkew: 1
-          topologyKey: ubi.io/host
+          topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
           labelSelector:
             matchLabels:
