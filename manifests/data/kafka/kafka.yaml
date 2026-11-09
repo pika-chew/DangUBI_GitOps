@@ -1,0 +1,89 @@
+# KafkaNodePool: 브로커 파드의 개수·역할·디스크·배치를 정한다.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: dual-role
+  labels:
+    # 이 풀이 어느 Kafka 클러스터에 속하는지 정한다.
+    strimzi.io/cluster: dangubi-kafka
+  annotations:
+    # 앱 안에서 오퍼레이터 chart(wave 0)가 뜬 뒤에 적용한다.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 3
+  # controller와 broker를 한 파드가 겸한다.
+  roles:
+    - controller
+    - broker
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: 10Gi
+        # storage 담당이 만든 정적 local PV용 StorageClass.
+        class: local-kafka
+        # CR을 지워도 PVC(데이터)는 남긴다.
+        deleteClaim: false
+        # KRaft 메타데이터 로그를 데이터와 같은 디스크에 둔다.
+        kraftMetadata: shared
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1536Mi
+    limits:
+      memory: 2Gi
+  jvmOptions:
+    -Xms: 768m
+    -Xmx: 768m
+  template:
+    pod:
+      topologySpreadConstraints:
+        # 워커 VM이 물리 서버마다 1대씩이라, 노드 기준으로 나눈다.
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              strimzi.io/cluster: dangubi-kafka
+              strimzi.io/kind: Kafka
+---
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: dangubi-kafka
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  kafka:
+    version: 4.3.1
+    listeners:
+      # 클러스터 내부 전용 평문 리스너. Connect와 Debezium만 접속한다. TLS+인증은 개선안으로 남긴다.
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      # 토픽 기본 복제 3, 쓰기 성공 기준 2(과반수)
+      default.replication.factor: 3
+      min.insync.replicas: 2
+      # 컨슈머 오프셋·트랜잭션 내부 토픽도 같은 기준으로 맞춘다.
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      # 토픽은 KafkaTopic(topics.yaml)으로만 만든다.
+      auto.create.topics.enable: false
+      # 7일. 장애 후 재처리할 시간을 남긴다.
+      log.retention.hours: 168
+  entityOperator:
+    # KafkaTopic CR을 실제 토픽으로 만드는 Topic Operator만 켠다.
+    # KafkaUser를 쓰지 않으므로 User Operator는 생략해 자원을 아낀다.
+    topicOperator:
+      # 필수: dangubi-data ResourceQuota 때문에 requests·limits가 없으면 파드가 생성되지 않는다.
+      # 토픽 5개만 관리해서 가볍다.
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 512Mi

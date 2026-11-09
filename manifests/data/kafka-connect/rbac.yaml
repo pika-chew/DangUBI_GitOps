@@ -1,0 +1,30 @@
+# Connect 워커가 커넥터 설정 참조를 풀 수 있도록 Secret 읽기 권한을 준다.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dangubi-connect-secret-reader
+  annotations:
+    # Secret(wave 0) 다음, KafkaConnect(wave 2) 이전.
+    argocd.argoproj.io/sync-wave: "1"
+rules:
+  # 최소 권한: 커넥터가 실제로 참조하는 Secret 두 개만, 조회(get)만 허용한다.
+  # ghcr-push는 오퍼레이터(이미지 빌드)만 쓰므로 워커에는 권한을 주지 않는다.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["debezium-cred", "mongo-cred"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dangubi-connect-secret-reader
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dangubi-connect-secret-reader
+subjects:
+  - kind: ServiceAccount
+    name: dangubi-connect-connect
+    namespace: dangubi-data
