@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - storageclasses.yaml
   - kafka-local-pvs.yaml
+  - mongodb-local-pvs.yaml

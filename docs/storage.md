@@ -5,16 +5,17 @@
 - `apps/infra/cinder-csi.yaml`: 공식 chart `openstack-cinder-csi` 2.36.5를 사용한다.
   이 chart의 기본 드라이버 이미지는 v1.36.0이며 Kubernetes 1.36과 같은 minor 버전이다.
 - `helm/cinder-csi/values.yaml`: 전용 Secret 참조, Worker의 controller 2개와 node DaemonSet을 설정한다.
-- `apps/infra/storage.yaml`: StorageClass와 Kafka의 정적 local PV를 별도 Application으로 관리한다.
-- MongoDB용 local PV와 MySQL의 백엔드별 StorageClass는 별도로 구성한다.
+- `apps/infra/storage.yaml`: StorageClass와 Kafka·MongoDB의 정적 local PV를 별도 Application으로 관리한다.
+- MySQL의 백엔드별 StorageClass는 별도로 구성한다.
 
 | StorageClass | 용도 | 프로비저닝 | PVC 삭제 후 |
 | --- | --- | --- | --- |
 | `cinder-retain` | Cinder 동적 볼륨 | Cinder CSI | PV·볼륨 보존 |
 | `local-retain` | Worker 로컬 디스크 | 정적 PV 별도 생성 | PV·데이터 보존 |
 | `local-kafka` | Kafka 브로커 전용 | Worker별 정적 PV | PV·데이터 보존 |
+| `local-mongodb` | MongoDB 멤버 전용 | Worker별 정적 PV | PV·데이터 보존 |
 
-세 클래스 모두 기본값으로 지정하지 않는다. PVC에 `storageClassName`을 명시한다.
+네 클래스 모두 기본값으로 지정하지 않는다. PVC에 `storageClassName`을 명시한다.
 `WaitForFirstConsumer`는 Pod 배치 조건을 고려하도록 바인딩·볼륨 생성을 늦춘다.
 PVC만 생성한 시점의 `Pending`은 이 모드에서 반드시 오류를 의미하지는 않는다.
 `cinder-retain`은 확장을 허용하지만 실제 Cinder 백엔드와 파일시스템의 지원 여부를 확인해야 한다.
@@ -78,7 +79,7 @@ kctl -n kube-system rollout status daemonset/cinder-csi-nodeplugin --timeout=300
 kctl get csidriver cinder.csi.openstack.org
 kctl get csinodes
 kctl get nodes -L topology.cinder.csi.openstack.org/zone
-kctl get storageclass cinder-retain local-retain local-kafka
+kctl get storageclass cinder-retain local-retain local-kafka local-mongodb
 ```
 
 controller는 서로 다른 Worker에 2개, node plugin은 Worker 4대에 1개씩 실행한다.
@@ -131,6 +132,23 @@ df -hT /mnt/data/kafka
 kctl get pv -l app.kubernetes.io/component=kafka
 kctl -n dangubi-data get pvc,pod -l strimzi.io/cluster=dangubi-kafka -o wide
 ```
+
+## MongoDB local PV 준비와 확인
+
+`k8s-worker-1`·`k8s-worker-2`·`k8s-worker-4`의 `/mnt/data/mongodb`를 각각 PV 하나에 연결한다.
+MongoDB를 배포할 때는 멤버별 PVC의 `storageClassName`을 `local-mongodb`, 요청 용량을 `20Gi`로 맞춘다.
+`20Gi`는 초기 검증용 PVC 매칭 용량이며, 공유 OS 디스크의 실제 사용량은 제한하지 않는다.
+
+동기화 전에 노드의 `kubernetes.io/hostname` 라벨과 `Ready` 상태를 확인한다.
+각 Worker에 MongoDB 전용 디렉터리를 준비하고, 배포에 사용할 이미지의 실행 UID·GID와 Pod 보안 설정에
+맞춰 쓰기 권한을 설정한다. Kafka가 함께 배치된 Worker 2·4에서는 두 서비스의 디스크 사용량을 함께 확인한다.
+
+```sh
+kctl get nodes k8s-worker-1 k8s-worker-2 k8s-worker-4 -L kubernetes.io/hostname
+kctl get pv -l app.kubernetes.io/component=mongodb
+```
+
+MongoDB를 배포한 후 멤버별 PVC가 각각 다른 PV에 바인딩되고, 데이터 디렉터리에 쓰기가 가능한지 확인한다.
 
 ## 로컬 검증
 

@@ -42,3 +42,18 @@ provisioner: kubernetes.io/no-provisioner
 reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: false
+---
+# MongoDB의 PVC가 Kafka용 PV와 섞이지 않도록 별도 클래스를 사용한다.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-mongodb
+  labels:
+    app.kubernetes.io/part-of: dangubi
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+provisioner: kubernetes.io/no-provisioner
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: false
