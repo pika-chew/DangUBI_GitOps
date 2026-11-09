@@ -4,7 +4,7 @@ metadata:
   name: dangubi-workloads
   namespace: argocd
 spec:
-  description: Command와 Query 애플리케이션 배포
+  description: Collector·Query 애플리케이션과 배치 CronJob 배포
   sourceRepos:
     - https://github.com/pika-chew/DangUBI_GitOps.git
   destinations:
