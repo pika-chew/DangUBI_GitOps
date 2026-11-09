@@ -1,0 +1,45 @@
+# Sink 커넥터: outbox 토픽의 메시지를 MongoDB 읽기 모델에 쓴다.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaConnector
+metadata:
+  name: dangubi-mongo-sink
+  labels:
+    strimzi.io/cluster: dangubi-connect
+  annotations:
+    # KafkaConnect(wave 2)가 Ready가 된 뒤에 등록한다.
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  class: com.mongodb.kafka.connect.MongoSinkConnector
+  # 토픽당 파티션이 3개라 태스크 3개가 최대 병렬이다.
+  tasksMax: 3
+  autoRestart:
+    enabled: true
+  config:
+    # 값은 Secret mongo-cred에서 읽는다(Vault → ExternalSecret).
+    connection.uri: ${secrets:dangubi-data/mongo-cred:uri}
+    database: ubi_read
+    topics: outbox.vehicle_summary,outbox.trip_score,outbox.monthly_premium
+    # 토픽마다 저장할 컬렉션을 지정한다.
+    topic.override.outbox.vehicle_summary.collection: vehicle_summary
+    topic.override.outbox.trip_score.collection: trip_score
+    topic.override.outbox.monthly_premium.collection: monthly_premium
+
+    key.converter: org.apache.kafka.connect.storage.StringConverter
+    value.converter: org.apache.kafka.connect.json.JsonConverter
+    value.converter.schemas.enable: false
+
+    # 문서 _id는 payload 안의 _id 값을 그대로 쓴다.
+    # _id 기준으로 문서를 통째로 교체한다. 같은 메시지가 두 번 와도 결과가 같다(멱등).
+    document.id.strategy: com.mongodb.kafka.connect.sink.processor.id.strategy.ProvidedInValueStrategy
+    writemodel.strategy: com.mongodb.kafka.connect.sink.writemodel.strategy.ReplaceOneDefaultStrategy
+
+    errors.retry.timeout: 300000
+    # 실패한 메시지는 커넥터를 멈추지 않고 DLQ로 보낸다.
+    # errors.tolerance는 변환 실패, mongo.errors.tolerance는 MongoDB 쓰기 실패에 적용된다.
+    errors.tolerance: all
+    mongo.errors.tolerance: all
+    errors.deadletterqueue.topic.name: dangubi.mongo-sink.dlq
+    errors.deadletterqueue.topic.replication.factor: 3
+    # 실패 원인과 원본 토픽·offset을 DLQ 메시지 헤더에 기록해 원인 분석과 재처리에 쓴다.
+    errors.deadletterqueue.context.headers.enable: true
+    errors.log.enable: true
