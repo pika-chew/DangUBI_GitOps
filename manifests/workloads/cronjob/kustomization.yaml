@@ -1,12 +1,28 @@
 # 주기 작업 묶음. apps/workloads/cronjob.yaml이 이 경로를 동기화한다.
-# 작업 하나당 파일 하나로 추가한다.
-# manual/ 폴더는 테스트 때 손으로 한 번 실행하는 Job이다. Argo CD가 동기화하지 않도록 resources에 넣지 않는다.
-# CronJob을 추가하면 같은 이름의 수동 Job도 manual/에 두면 된다.
+# 작업 하나당 파일 하나. 배치 앱 작업은 같은 이미지에 args(job 이름)만 다르다.
+# manual/ 폴더는 테스트 때 손으로 한 번 실행하는 Job이라 resources에 넣지 않는다(Argo CD가 동기화하지 않음).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 namespace: dangubi
 
 resources:
-  - outbox-cleanup.yaml   # Debezium이 읽어 간 오래된 outbox 행 삭제
-  # TODO: 다른 주기 작업이 생기면 여기에 추가한다.
+  # 배치 앱 공용
+  - batch-config.yaml           # 공용 설정 (Spring 프로필, DB 주소 등)
+  - batch-externalsecret.yaml   # 공용 DB 계정 (Vault → Secret)
+  # 스케줄 작업 (시간순)
+  - db-backup.yaml              # 매일 02:00, 배치 앱 아님
+  - daily-pipeline.yaml         # 매일 03:00
+  - monthly-finalize.yaml       # 매월 1일 05:00
+  - cleanup.yaml                # 매일 06:00
+  # 수동 실행 전용 (suspend: true)
+  - reconcile.yaml
+  - ingest.yaml
+  - score.yaml
+
+# 배치 앱 이미지는 여기 한 곳에서만 정한다. 각 CronJob은 image: dangubi-batch라고만 쓰고, 빌드할 때 아래 값으로 바뀐다.
+images:
+  - name: dangubi-batch
+    # TODO: GHCR 배치 앱 이미지 경로와 태그
+    newName: ghcr.io/pika-chew/CHANGE_ME
+    newTag: CHANGE_ME

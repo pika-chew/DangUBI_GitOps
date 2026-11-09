@@ -1,0 +1,53 @@
+# 배치 앱 작업을 원하는 때에 한 번 실행하는 테스트용 Job. args만 바꿔서 어떤 작업이든 실행한다.
+# Argo CD가 동기화하지 않는다 (../kustomization.yaml의 resources에 없음).
+#
+# 보통은 이 파일 없이 CronJob 설정 그대로 실행하면 된다 (이미지·설정이 어긋날 걱정이 없다).
+#   kubectl -n dangubi create job --from=cronjob/<이름> <이름>-manual-$(date +%s)
+#   예: kubectl -n dangubi create job --from=cronjob/daily-pipeline daily-pipeline-manual-$(date +%s)
+#   suspend 상태인 reconcile·ingest·score도 이 방법으로 실행된다.
+#
+# 이 파일은 CronJob과 다른 값으로 시험할 때 쓴다 (다른 이미지 태그, 다른 args, 추가 파라미터 등).
+#   1. 아래 image와 args를 바꾼다.
+#      (이 파일은 kustomize를 거치지 않으므로 image에 실제 경로·태그를 적어야 한다.)
+#   2. kubectl -n dangubi create -f manifests/workloads/cronjob/manual/batch-job.yaml
+#      (generateName이라 apply가 아니라 create. 실행할 때마다 새 이름으로 만들어진다.)
+#   3. kubectl -n dangubi logs -l dangubi.io/trigger=manual --tail=200
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: batch-manual-
+  namespace: dangubi
+  labels:
+    app.kubernetes.io/component: batch
+    app.kubernetes.io/part-of: dangubi
+    # CronJob이 만든 Job과 구분하기 위한 표시.
+    dangubi.io/trigger: manual
+spec:
+  backoffLimit: 0
+  # 끝나고 1시간 뒤 자동 삭제. 수동 Job이 쌓이지 않게 한다.
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: batch
+        dangubi.io/trigger: manual
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: batch
+          # TODO: 시험할 이미지 (kustomization.yaml의 images와 같은 경로)
+          image: ghcr.io/pika-chew/CHANGE_ME:CHANGE_ME
+          # 실행할 작업: dailyPipelineJob | monthlyFinalizeJob | cleanupJob | reconcileJob | ingestJob | scoreJob
+          args: ["CHANGE_ME"]
+          envFrom:
+            - configMapRef:
+                name: batch-config
+            - secretRef:
+                name: batch-db-cred
+          # 필수: dangubi 네임스페이스 ResourceQuota 때문에 requests·limits가 없으면 파드가 생성되지 않는다.
+          resources:
+            requests:
+              cpu: CHANGE_ME
+              memory: CHANGE_ME
+            limits:
+              memory: CHANGE_ME

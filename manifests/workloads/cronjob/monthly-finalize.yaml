@@ -1,0 +1,46 @@
+# monthly-finalize: 매월 1일 05:00. 배치 앱의 monthlyFinalizeJob을 실행한다.
+# TODO: 이 작업이 하는 일 (예: 지난달 보험료 확정)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: monthly-finalize
+  labels:
+    app.kubernetes.io/name: monthly-finalize
+    app.kubernetes.io/component: batch
+    app.kubernetes.io/part-of: dangubi
+spec:
+  schedule: "0 5 1 * *"
+  timeZone: Asia/Seoul
+  suspend: false
+  concurrencyPolicy: Forbid
+  # TODO: 한 달에 한 번이라 놓치면 영향이 크다. 클러스터 장애로 05:00에 못 돌았을 때
+  #       몇 초 안에는 늦게라도 실행할지 정한다 (예: 21600 = 6시간).
+  # startingDeadlineSeconds: 21600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: monthly-finalize
+            app.kubernetes.io/component: batch
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: batch
+              image: dangubi-batch
+              args: ["monthlyFinalizeJob"]
+              envFrom:
+                - configMapRef:
+                    name: batch-config
+                - secretRef:
+                    name: batch-db-cred
+              # 필수: dangubi 네임스페이스 ResourceQuota 때문에 requests·limits가 없으면 파드가 생성되지 않는다.
+              resources:
+                requests:
+                  cpu: CHANGE_ME
+                  memory: CHANGE_ME
+                limits:
+                  memory: CHANGE_ME

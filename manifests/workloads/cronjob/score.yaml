@@ -1,0 +1,46 @@
+# score: 수동 실행 전용. 배치 앱의 scoreJob을 실행한다.
+# TODO: 이 작업이 하는 일 (예: 점수 재계산)
+#
+# 실행: kubectl -n dangubi create job --from=cronjob/score score-manual-$(date +%s)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: score
+  labels:
+    app.kubernetes.io/name: score
+    app.kubernetes.io/component: batch
+    app.kubernetes.io/part-of: dangubi
+spec:
+  # 스케줄로는 돌지 않는다 (2월 31일 = 오지 않는 날짜, reconcile.yaml 참고).
+  schedule: "0 0 31 2 *"
+  timeZone: Asia/Seoul
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: score
+            app.kubernetes.io/component: batch
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: batch
+              image: dangubi-batch
+              args: ["scoreJob"]
+              envFrom:
+                - configMapRef:
+                    name: batch-config
+                - secretRef:
+                    name: batch-db-cred
+              # 필수: dangubi 네임스페이스 ResourceQuota 때문에 requests·limits가 없으면 파드가 생성되지 않는다.
+              resources:
+                requests:
+                  cpu: CHANGE_ME
+                  memory: CHANGE_ME
+                limits:
+                  memory: CHANGE_ME
