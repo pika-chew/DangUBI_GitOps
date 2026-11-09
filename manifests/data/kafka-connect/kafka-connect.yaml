@@ -62,8 +62,7 @@ spec:
   build:
     output:
       type: docker
-      # GitHub 계정(조직)이 정해지면 교체한다.
-      image: ghcr.io/CHANGE_ME_GITHUB_OWNER/dangubi-connect:latest
+      image: ghcr.io/pika-chew/dangubi-connect:latest
       pushSecret: ghcr-push
     plugins:
       - name: debezium-mysql
