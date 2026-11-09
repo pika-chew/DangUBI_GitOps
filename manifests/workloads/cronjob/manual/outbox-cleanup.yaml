@@ -1,0 +1,51 @@
+# outbox-cleanup을 원하는 때에 한 번 실행하는 테스트용 Job.
+#
+# Argo CD가 동기화하지 않는다 (../kustomization.yaml의 resources에 없음).
+# Job은 한 번 만들면 내용을 바꿀 수 없고 동기화 때마다 다시 실행될 수 있어서, GitOps 대상에서 뺐다.
+#
+# 실행 (generateName이라 apply가 아니라 create를 쓴다. 실행할 때마다 새 이름으로 만들어진다)
+#   kubectl -n dangubi create -f manifests/workloads/cronjob/manual/outbox-cleanup.yaml
+# 확인 / 정리
+#   kubectl -n dangubi get jobs -l app.kubernetes.io/name=outbox-cleanup
+#   kubectl -n dangubi logs job/<생성된 이름>
+#   (ttlSecondsAfterFinished가 지나면 자동으로 지워진다)
+#
+# CronJob 설정을 그대로 쓰고 싶으면 이 파일 없이도 된다 (내용이 어긋날 걱정이 없다)
+#   kubectl -n dangubi create job --from=cronjob/outbox-cleanup outbox-cleanup-manual-$(date +%s)
+#   Argo CD 화면에서 CronJob을 눌러 "Create Job" 액션을 실행해도 같다.
+#
+# 이 파일의 spec은 ../outbox-cleanup.yaml의 jobTemplate.spec과 같게 유지한다. 한쪽을 바꾸면 다른 쪽도 바꾼다.
+# 테스트용으로 값을 바꿔 볼 때(예: 보존 기간을 짧게)는 이 파일만 바꿔서 실행한다.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: outbox-cleanup-manual-
+  namespace: dangubi
+  labels:
+    app.kubernetes.io/name: outbox-cleanup
+    app.kubernetes.io/part-of: dangubi
+    # CronJob이 만든 Job과 구분하기 위한 표시.
+    dangubi.io/trigger: manual
+spec:
+  backoffLimit: 2
+  # 끝나고 1시간 뒤 자동 삭제. 수동 Job이 쌓이지 않게 한다.
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: outbox-cleanup
+        dangubi.io/trigger: manual
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: outbox-cleanup
+          # TODO: ../outbox-cleanup.yaml과 같은 이미지·명령·계정
+          image: CHANGE_ME
+          command: ["CHANGE_ME"]
+          # 필수: dangubi 네임스페이스 ResourceQuota 때문에 requests·limits가 없으면 파드가 생성되지 않는다.
+          resources:
+            requests:
+              cpu: CHANGE_ME
+              memory: CHANGE_ME
+            limits:
+              memory: CHANGE_ME

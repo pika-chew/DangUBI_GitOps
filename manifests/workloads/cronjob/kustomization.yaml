@@ -1,5 +1,7 @@
 # 주기 작업 묶음. apps/workloads/cronjob.yaml이 이 경로를 동기화한다.
 # 작업 하나당 파일 하나로 추가한다.
+# manual/ 폴더는 테스트 때 손으로 한 번 실행하는 Job이다. Argo CD가 동기화하지 않도록 resources에 넣지 않는다.
+# CronJob을 추가하면 같은 이름의 수동 Job도 manual/에 두면 된다.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
