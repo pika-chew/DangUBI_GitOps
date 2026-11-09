@@ -9,7 +9,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 rules:
   # 최소 권한: 커넥터가 실제로 참조하는 Secret 두 개만, 조회(get)만 허용한다.
-  # ghcr-push는 오퍼레이터와 kubelet이 쓰므로 워커에는 권한을 주지 않는다.
+  # ghcr-push는 오퍼레이터(이미지 빌드)만 쓰므로 워커에는 권한을 주지 않는다.
   - apiGroups: [""]
     resources: ["secrets"]
     resourceNames: ["debezium-cred", "mongo-cred"]

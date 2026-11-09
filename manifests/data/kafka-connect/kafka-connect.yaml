@@ -45,9 +45,6 @@ spec:
 
   template:
     pod:
-      # GHCR 패키지가 private이면 빌드한 이미지를 pull할 때도 로그인이 필요하다.
-      imagePullSecrets:
-        - name: ghcr-push
       topologySpreadConstraints:
         # 무상태라 반드시 나눌 필요는 없다. 가능하면 다른 노드에 두고, 안 되면 같은 노드도 허용한다.
         - maxSkew: 1
