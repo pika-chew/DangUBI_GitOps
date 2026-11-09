@@ -1,8 +1,8 @@
-# Collector API(Spring) Application.
+# Collector(Spring) Application.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dangubi-collector-api
+  name: dangubi-collector
   namespace: argocd
   annotations:
     # wave 3: MySQL(0), Kafka(1), Kafka Connect(2)가 뜬 뒤에 올라온다.

@@ -1,26 +1,26 @@
-# Collector API 파드. 차량 주행 데이터를 받아 MySQL에 저장하는 수집 API다.
+# Collector 파드. 차량 주행 데이터를 받아 MySQL에 저장하는 수집 API다.
 # TODO: 점수 계산과 outbox 기록을 이 앱이 하는지, 다른 곳(배치 등)이 하는지 정한다.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: collector-api
+  name: collector
   labels:
-    app.kubernetes.io/name: collector-api
+    app.kubernetes.io/name: collector
     app.kubernetes.io/part-of: dangubi
 spec:
   # TODO: 레플리카 수 (가용성 vs 자원)
   replicas: 2
   selector:
     matchLabels:
-      app.kubernetes.io/name: collector-api
+      app.kubernetes.io/name: collector
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: collector-api
+        app.kubernetes.io/name: collector
         app.kubernetes.io/part-of: dangubi
     spec:
       containers:
-        - name: collector-api
+        - name: collector
           # TODO: GHCR 이미지 경로와 태그 (태그 자동 갱신 방식에 맞춘다)
           image: ghcr.io/pika-chew/CHANGE_ME:CHANGE_ME
           ports:
@@ -28,7 +28,7 @@ spec:
               containerPort: 8080
           envFrom:
             - configMapRef:
-                name: collector-api-config
+                name: collector-config
           env:
             # Vault → ExternalSecret으로 만든 Secret에서 DB 계정을 읽는다.
             - name: SPRING_DATASOURCE_USERNAME

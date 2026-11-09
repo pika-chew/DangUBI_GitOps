@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: collector-api-config
+  name: collector-config
 data:
   # TODO: Spring 프로필
   SPRING_PROFILES_ACTIVE: CHANGE_ME
