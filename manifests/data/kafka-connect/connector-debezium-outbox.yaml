@@ -54,5 +54,4 @@ spec:
     # 같은 차량은 같은 파티션으로 가서 순서가 보장된다.
     transforms.outbox.table.field.event.key: aggregateid
     transforms.outbox.table.expand.json.payload: true
-    # type 컬럼은 본문이 아니라 헤더 eventType으로 보낸다.
     transforms.outbox.table.fields.additional.placement: type:header:eventType
