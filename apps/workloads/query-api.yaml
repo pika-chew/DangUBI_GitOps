@@ -1,13 +1,31 @@
-# dangubi-query-api (Argo CD Application)
-# - 역할: manifests/workloads/query/를 동기화한다. MongoDB 읽기 모델을 조회하는 API (Argo Rollouts blue-green).
-# - 채울 것:
-#   - sync-wave: 3 (MongoDB 0 → Mongo Sink 2 다음)
-#   - project: dangubi-workloads / destination namespace: dangubi
-#   - source: GitOps 저장소, targetRevision main, path manifests/workloads/query
-#   - syncPolicy: automated(prune, selfHeal)
-#   - Argo Rollouts 컨트롤러(Rollout CRD)가 먼저 설치돼 있어야 한다. 없으면 SkipDryRunOnMissingResource + retry 고려
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: dangubi-query-api
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: dangubi-workloads
+  source:
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+    targetRevision: main
+    path: manifests/workloads/query
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dangubi
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Rollout(Argo Rollouts)과 ExternalSecret은 각 컨트롤러가 설치될 때 등록되는 리소스 종류다.
+      # 그 전에 동기화되면 배포 전 검사(dry-run)가 실패하므로, 등록 전에는 검사만 건너뛴다.
+      - SkipDryRunOnMissingResource=true
+    retry:
+      # 컨트롤러가 늦게 뜨는 동안의 적용 실패를 재시도로 흡수한다. 30s → 1m → 2m → 4m → 5m(상한), 최대 10회.
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
