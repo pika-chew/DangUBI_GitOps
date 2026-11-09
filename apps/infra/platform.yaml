@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-platform
+  namespace: argocd
+  annotations:
+    # 부모 Application이 플랫폼 설정을 먼저 등록하도록 한다.
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  project: dangubi-infra
+  source:
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+    targetRevision: main
+    path: manifests/infra/platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dangubi
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

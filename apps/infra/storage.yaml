@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-storage
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: dangubi-infra
+  source:
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+    targetRevision: main
+    path: manifests/infra/storage
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dangubi-data
+  syncPolicy:
+    automated:
+      # PVC가 참조하는 StorageClass를 Git에서 삭제했다는 이유로 자동 삭제하지 않는다.
+      prune: false
+      selfHeal: true

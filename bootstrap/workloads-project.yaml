@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dangubi-workloads
+  namespace: argocd
+spec:
+  description: Command와 Query 애플리케이션 배포
+  sourceRepos:
+    - https://github.com/pika-chew/DangUBI_GitOps.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: dangubi
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+    - group: argoproj.io
+      kind: Application
+    - group: argoproj.io
+      kind: ApplicationSet
+    - group: argoproj.io
+      kind: AppProject

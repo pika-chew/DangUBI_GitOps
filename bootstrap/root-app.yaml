@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-root
+  namespace: argocd
+spec:
+  project: dangubi-root
+  source:
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+    targetRevision: main
+    path: apps
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      # Git에서 삭제한 Application은 수동으로 정리한다.
+      prune: false
+      selfHeal: true

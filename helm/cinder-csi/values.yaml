@@ -1,0 +1,111 @@
+nameOverride: cinder-csi
+clusterID: dangubi
+
+# 인증 정보는 Git에 넣지 않고 미리 준비한 전용 Secret을 참조한다.
+secret:
+  enabled: true
+  create: false
+  hostMount: false
+  name: dangubi-cinder-cloud-config
+  filename: cloud.conf
+
+# StorageClass는 별도 Application에서 관리하며 chart의 Delete 클래스를 생성하지 않는다.
+storageClass:
+  enabled: false
+
+csi:
+  # snapshotter ~ nodeDriverRegitst는 Sidecar (Kubernetes API와 Cinder 드라이버 사이의 공통 제어 로직을 대신 수행하는 보조 컨테이너)
+  # CSI 드라이버에 볼륨 스냅샷 생성/삭제를 요청하는 보조 컨테이너 (현재는 비활성화)
+  # Snapshot CRD와 공통 snapshot-controller는 해당 기능 도입 시 별도로 설치
+  snapshotter:
+    enabled: false
+  # VolumeAttachment를 감지해 CSI 드라이버에 볼륨의 노드 연결/분리를 요청
+  attacher:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+  # PVC 요청에 맞는 Cinder 볼륨과 PV 생성/삭제를 처리
+  provisioner:
+    topology: "true"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+  # PVC 용량 증가를 감지해 CSI 드라이버에 볼륨 확장 요청
+  resizer:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+  # CSI 드라이버 상태를 확인하고, kubelet의 생존 검사에 사용할 HTTP 응답을 제공
+  livenessprobe:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 64Mi
+  # 각 노드의 kubelet에 CSI 드라이버와 소켓 경로를 등록
+  nodeDriverRegistrar:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 64Mi
+  # 보조 컨테이너의 요청을 받아 OpenStack API 호출과 노드의 볼륨 작업을 수행하는 드라이버 (즉, 실제 Cinder CSI 드라이버)
+  plugin:
+    # 현재 사용하지 않는 CA 디렉터리를 hostPath로 생성하지 않는다.
+    volumes: []
+    volumeMounts:
+      - name: cloud-config
+        mountPath: /etc/config
+        readOnly: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+    # Deployment로 실행하며 볼륨 생성·연결·확장 등 클러스터 차원의 작업을 담당한다.
+    controllerPlugin:
+      replicas: 2
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+        # 한 노드의 장애로 controller 두 개가 모두 중단되지 않도록 서로 다른 노드에 배치한다.
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: cinder-csi
+                  component: controllerplugin
+                  release: cinder-csi
+              topologyKey: kubernetes.io/hostname
+    # DaemonSet으로 대상 노드마다 실행하며 볼륨을 Pod에서 사용할 수 있도록 마운트·해제한다.
+    nodePlugin:
+      # CSI 등록·마운트 경로의 기준이며, 실제 노드의 kubelet 루트 디렉터리와 일치해야 한다.
+      kubeletDir: /var/lib/kubelet
+      nodeSelector:
+        kubernetes.io/os: linux
+      # control-plane 레이블이 없는 Linux 노드에서만 실행한다.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
