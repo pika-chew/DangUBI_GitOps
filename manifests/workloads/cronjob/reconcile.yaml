@@ -1,48 +1,14 @@
-# reconcile: 수동 실행 전용. 배치 앱의 reconcileJob을 실행한다.
-# TODO: 이 작업이 하는 일 (예: MySQL과 MongoDB 읽기 모델 비교·보정)
-#
-# 실행: kubectl -n dangubi create job --from=cronjob/reconcile reconcile-manual-$(date +%s)
-#       (suspend 상태여도 --from으로는 실행된다. Argo CD 화면의 "Create Job" 액션도 같다.)
+# reconcile (CronJob) — 수동 실행 전용, suspend true
+# - 역할: 배치 앱으로 reconcileJob을 실행한다 (예: MySQL과 MongoDB 읽기 모델 비교·보정). 스케줄로는 돌지 않는다.
+# - 실행: kubectl -n dangubi create job --from=cronjob/reconcile reconcile-manual-$(date +%s)
+#         (suspend 상태여도 --from으로는 실행된다. Argo CD 화면의 CronJob "Create Job" 액션도 같다)
+# - 채울 것:
+#   - suspend: true
+#   - schedule: CronJob 필수 필드라 넣어야 한다. 오지 않는 날짜(예: "0 0 31 2 *", 2월 31일)로 두면
+#     실수로 suspend를 풀어도 실행되지 않는다
+#   - args --spring.batch.job.name=reconcileJob, Job 파라미터
+#   - 이미지, envFrom(MongoDB도 쓰면 그 접속 정보), resources(quota 필수)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: reconcile
-  labels:
-    app.kubernetes.io/name: reconcile
-    app.kubernetes.io/component: batch
-    app.kubernetes.io/part-of: dangubi
-spec:
-  # 스케줄로는 돌지 않는다. schedule은 CronJob 필수 필드라 넣었고,
-  # 2월 31일은 오지 않는 날짜라 실수로 suspend를 풀어도 실행되지 않는다.
-  schedule: "0 0 31 2 *"
-  timeZone: Asia/Seoul
-  suspend: true
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
-  jobTemplate:
-    spec:
-      backoffLimit: 0
-      template:
-        metadata:
-          labels:
-            app.kubernetes.io/name: reconcile
-            app.kubernetes.io/component: batch
-        spec:
-          restartPolicy: Never
-          containers:
-            - name: batch
-              image: dangubi-batch
-              args: ["reconcileJob"]
-              envFrom:
-                - configMapRef:
-                    name: batch-config
-                - secretRef:
-                    name: batch-db-cred
-              # 필수: dangubi 네임스페이스 ResourceQuota 때문에 requests·limits가 없으면 파드가 생성되지 않는다.
-              resources:
-                requests:
-                  cpu: CHANGE_ME
-                  memory: CHANGE_ME
-                limits:
-                  memory: CHANGE_ME

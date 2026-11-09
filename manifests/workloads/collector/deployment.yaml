@@ -1,60 +1,14 @@
-# Collector 파드. 차량 주행 데이터를 받아 MySQL에 저장하는 수집 API다.
-# TODO: 점수 계산과 outbox 기록을 이 앱이 하는지, 다른 곳(배치 등)이 하는지 정한다.
+# collector (Deployment)
+# - 역할: 차량 주행 데이터를 받아 MySQL에 저장하는 수집 API 파드.
+# - 정할 것: 점수 계산과 outbox 기록을 이 앱이 하는지, 배치(daily-pipeline 등)가 하는지
+# - 채울 것:
+#   - replicas, 라벨·셀렉터
+#   - 이미지(GHCR 경로·태그), 포트
+#   - 설정: envFrom collector-config / 계정: collector-mysql-cred Secret
+#   - resources: requests(cpu, memory) + limits(memory) 필수 — dangubi ResourceQuota 때문에 없으면 파드가 생성되지 않는다
+#   - readiness/liveness probe (Spring Actuator)
+#   - 노드 분산 (topologySpreadConstraints, kubernetes.io/hostname)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: collector
-  labels:
-    app.kubernetes.io/name: collector
-    app.kubernetes.io/part-of: dangubi
-spec:
-  # TODO: 레플리카 수 (가용성 vs 자원)
-  replicas: 2
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: collector
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: collector
-        app.kubernetes.io/part-of: dangubi
-    spec:
-      containers:
-        - name: collector
-          # TODO: GHCR 이미지 경로와 태그 (태그 자동 갱신 방식에 맞춘다)
-          image: ghcr.io/pika-chew/CHANGE_ME:CHANGE_ME
-          ports:
-            - name: http
-              containerPort: 8080
-          envFrom:
-            - configMapRef:
-                name: collector-config
-          env:
-            # Vault → ExternalSecret으로 만든 Secret에서 DB 계정을 읽는다.
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: collector-mysql-cred
-                  key: username
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: collector-mysql-cred
-                  key: password
-          # 필수: dangubi 네임스페이스 ResourceQuota 때문에 CPU·메모리 requests와 메모리 limits가 없으면 파드가 생성되지 않는다.
-          resources:
-            requests:
-              cpu: CHANGE_ME
-              memory: CHANGE_ME
-            limits:
-              memory: CHANGE_ME
-          # TODO: Spring Boot Actuator 경로에 맞춘다.
-          readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
-              port: http
-          livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
-              port: http
-      # TODO: 노드 분산 (Kafka처럼 topologySpreadConstraints, topologyKey: kubernetes.io/hostname)

@@ -1,43 +1,9 @@
-# db-backup: 매일 02:00. MySQL 백업. 배치 앱이 아니라 별도 이미지로 돈다.
-# 03:00 daily-pipeline보다 먼저 끝나야 파이프라인 실행 전 상태가 백업된다.
+# db-backup (CronJob) — 매일 02:00, suspend false
+# - 역할: MySQL 백업. 배치 앱이 아니라 별도 백업 도구 이미지로 돈다.
+#   03:00 daily-pipeline 전에 돌아 파이프라인 실행 전 상태를 남긴다.
+# - 채울 것: schedule "0 2 * * *", timeZone Asia/Seoul, concurrencyPolicy, 재시도,
+#           백업 도구 이미지·명령, 백업 전용 계정, 백업 파일 저장 위치와 보존 기간, resources(quota 필수)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: db-backup
-  labels:
-    app.kubernetes.io/name: db-backup
-    app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: dangubi
-spec:
-  schedule: "0 2 * * *"
-  timeZone: Asia/Seoul
-  suspend: false
-  # 이전 백업이 안 끝났으면 새로 시작하지 않는다.
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
-  jobTemplate:
-    spec:
-      backoffLimit: 1
-      template:
-        metadata:
-          labels:
-            app.kubernetes.io/name: db-backup
-            app.kubernetes.io/component: backup
-        spec:
-          restartPolicy: Never
-          containers:
-            - name: db-backup
-              # TODO: 백업 도구 이미지 (예: mysql 클라이언트의 mysqldump, Percona XtraBackup)
-              image: CHANGE_ME
-              # TODO: 백업 명령과 대상 DB
-              command: ["CHANGE_ME"]
-              # TODO: 백업 전용 계정 Secret (읽기·LOCK 권한). 배치 앱 계정과 분리하는 것을 권장한다.
-              # TODO: 백업 파일 저장 위치 (PVC, 오브젝트 스토리지 등)와 보존 기간
-              # 필수: dangubi 네임스페이스 ResourceQuota 때문에 requests·limits가 없으면 파드가 생성되지 않는다.
-              resources:
-                requests:
-                  cpu: CHANGE_ME
-                  memory: CHANGE_ME
-                limits:
-                  memory: CHANGE_ME

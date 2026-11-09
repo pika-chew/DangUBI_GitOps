@@ -1,16 +1,7 @@
-# Collector 접속 주소.
+# collector (Service)
+# - 역할: Collector API 접속 주소.
+# - 채울 것: type(클러스터 내부만이면 ClusterIP, MetalLB 외부 IP가 필요하면 LoadBalancer), selector, ports
 apiVersion: v1
 kind: Service
 metadata:
   name: collector
-  labels:
-    app.kubernetes.io/name: collector
-spec:
-  # TODO: 외부 노출 방식. 클러스터 내부만이면 ClusterIP, MetalLB로 외부 IP를 받으려면 LoadBalancer.
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: collector
-  ports:
-    - name: http
-      port: 80
-      targetPort: http
