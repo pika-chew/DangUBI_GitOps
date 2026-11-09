@@ -35,6 +35,8 @@ git 브랜치·커밋·PR 규칙은 `convention` 스킬을 따른다(main 직접
 # - 역할: 이 리소스가 하는 일 한두 줄.
 # - 설계 의도: 무엇이 개별이고 무엇을 묶는지, 왜 이렇게 나눴는지 (필요할 때만)
 # - 정할 것: 아직 결정되지 않은 것 (필요할 때만)
+# - 초안: kubectl create <종류> <이름> [옵션] --dry-run=client -o yaml   (만들 수 없는 종류면 "참고: <비슷한 기존 파일>")
+#   - 생성 후 고칠 것: (해당될 때만) 이 종류의 초안에 생기는 함정
 # - 채울 것:
 #   - 필드 이름과 넣을 값의 방향 (확정된 값이면 값까지)
 #   - 주의점 (예: resources 필수 — dangubi ResourceQuota)
@@ -51,10 +53,34 @@ metadata:
 - 표·목록을 받아 반영할 때도 같은 수준을 지킨다. 값(스케줄, 이름 등)은 "채울 것"에 적고 spec으로 쓰지 않는다.
 - 추측한 내용은 추측이라고 쓴다("~용도로 보인다"). 확인한 사실과 섞지 않는다.
 
+### 처음 만드는 매니페스트는 kubectl 초안부터 권한다
+사용자가 "채워줘", "작성해줘"라고 하지 않았다면, 새로 만드는 리소스마다 Claude가 spec을 쓰는 대신 사용자가 직접 초안을 뽑는 명령을 먼저 권한다. 빈 파일에서 시작하는 것보다 kubectl이 만든 기본 구조를 보고 채우는 편이 필드를 이해하기 쉽다. 사용자가 이 방법을 쓰는 중이다.
+
+- 각 파일 헤더의 "초안" 줄에 그 파일에 맞는 명령을 이름·이미지·포트 등 아는 값까지 넣어 적는다. 그대로 복사해 쓸 수 있게 한다.
+- 답변에도 파일별 명령을 표로 한 번 모아 보여 준다.
+- 명령을 Claude가 대신 실행해 파일을 채우지 않는다. 사용자가 직접 실행한다. (사용자가 "실행해서 넣어줘"라고 하면 그때는 해도 된다.)
+- 명령 문법이 확실하지 않으면 scratchpad에서 `--dry-run=client`로 한 번 돌려 보고 적는다. 클러스터 연결 없이도 동작한다.
+
+`kubectl create`로 만들 수 있는 종류와 생성 후 고칠 점:
+
+| 종류 | 초안 명령 예 | 생성 후 고칠 것 |
+| --- | --- | --- |
+| Deployment | `kubectl create deployment collector --image=<이미지>:<태그> --port=8080 --replicas=2 --dry-run=client -o yaml` | 라벨이 `app: <이름>`으로 생긴다(Service selector와 맞춤). `resources: {}`가 비어 있음 |
+| Service | `kubectl create service clusterip collector --tcp=80:8080 --dry-run=client -o yaml` | selector가 `app: <이름>`. 포트 이름이 `80-8080`처럼 생김 |
+| ConfigMap | `kubectl create configmap collector-config --from-literal=KEY=VALUE --dry-run=client -o yaml` | — |
+| CronJob | `kubectl create cronjob daily-pipeline --image=<이미지> --schedule="0 3 * * *" --dry-run=client -o yaml` | `--` 뒤 인자는 `command`로 들어가 이미지의 실행 명령을 덮어쓴다 → 앱 인자는 `args`로 옮긴다. `restartPolicy: OnFailure`가 기본. `timeZone`·`concurrencyPolicy`·`suspend`는 없음 |
+| Job | `kubectl create job batch-manual --image=<이미지> --dry-run=client -o yaml` | CronJob과 같음 |
+
+공통: `status: {}`, `strategy: {}`, `creationTimestamp: null`은 지운다. `-n`을 주면 `namespace:`가 들어가는데, kustomization이 붙여 주므로 빼도 된다. quota가 있는 네임스페이스면 `resources`를 반드시 채운다.
+
+만들 수 없는 종류(CRD — Application, Rollout, ExternalSecret, Strimzi CR 등)는 `kubectl create`가 `Unexpected args` 오류를 낸다. 이때는 "초안" 줄에 저장소의 비슷한 기존 파일을 적는다. 예: Application → `apps/infra/platform.yaml`, ExternalSecret → `manifests/data/kafka-connect/externalsecrets.yaml`, Rollout → Deployment 초안을 만든 뒤 `kind: Rollout`, `apiVersion: argoproj.io/v1alpha1`로 바꾸고 `strategy.blueGreen` 추가.
+
+필드 뜻은 `kubectl explain <경로>`(예: `kubectl explain cronjob.spec.concurrencyPolicy`)로 찾도록 안내한다. 클러스터 연결이 필요하고, CRD는 그 CRD가 설치된 클러스터에서만 된다.
+
 ### 끝나면
 1. 폴더별로 `kustomize build`가 되는지 확인한다(파일 구조 확인용).
 2. 단위별로 커밋한다. push는 사용자가 요청할 때만 한다.
-3. 답변에는 파일 트리, 각 파일의 역할 한 줄, 설계 의도, 사용자가 정해야 할 것을 적는다.
+3. 답변에는 파일 트리, 각 파일의 역할 한 줄, 설계 의도, 파일별 초안 명령 표, 사용자가 정해야 할 것을 적는다.
 4. 개요 상태로 `main`에 머지되면 spec 없는 리소스 때문에 동기화가 실패한다는 점을 알린다. PR을 만들면 본문 맨 위에도 적는다.
 
 ---
@@ -83,7 +109,7 @@ kubeconform의 `missing properties: 'spec'`은 그 리소스가 아직 개요 �
 | 비밀 값 | 평문 비밀번호·토큰이 없는지. Secret 대신 ExternalSecret인지 |
 | 금지 API | Strimzi는 `kafka.strimzi.io/v1`만 (`v1beta*`, `v1alpha*` 금지) |
 | 앱 실행 인자 | 앱 저장소가 정한 형식과 맞는지 (예: 배치 앱은 `--spring.batch.job.name=<Job>`, args이지 command가 아님) |
-| 흔한 실수 | `kubectl create --dry-run`으로 만든 YAML의 `status: {}`·`creationTimestamp: null`·빈 `resources: {}`, `--` 인자가 `command`로 들어간 것, `restartPolicy` 기본값 |
+| 초안 흔적 | kubectl 초안으로 시작한 파일이면 1장 표의 "생성 후 고칠 것"이 처리됐는지 (`status: {}`·빈 `resources: {}`, `--` 인자가 `command`로 들어간 것, `restartPolicy` 기본값 등) |
 
 Strimzi CR은 공용 카탈로그에 v1 스키마가 없을 수 있다. 그때는 해당 버전의 CRD를 받아 `openapi2jsonschema.py`로 스키마를 만든 뒤 `--schema-location`으로 넘긴다.
 
@@ -100,9 +126,3 @@ Strimzi CR은 공용 카탈로그에 v1 스키마가 없을 수 있다. 그때�
 - 개요 주석을 지우지 않고 커밋하지도 않는다. 사용자가 고칠 차례다.
 - 무엇이 왜 문제인지, 그대로 배포하면 어떻게 되는지, 어느 줄을 어떻게 고치면 되는지 알려 준다. 고친 코드를 통째로 써 주기보다 바꿀 부분을 짚어 준다.
 - 사소한 것(오타, 끝 공백)은 문제와 구분해 "선택"으로 알린다.
-
----
-
-## 참고: kubectl로 초안 만들기
-
-사용자가 처음부터 쓰기 어려워하면 `kubectl create <종류> --dry-run=client -o yaml > 파일.yaml`로 초안을 만드는 방법을 알려 준다. Deployment·Service·ConfigMap·CronJob·Job은 되고, CRD(Application, Rollout, ExternalSecret, Strimzi CR)는 안 된다. CRD는 저장소의 비슷한 기존 파일을 복사해서 시작한다. 필드 뜻은 `kubectl explain <경로>`로 찾는다(클러스터 연결 필요).
