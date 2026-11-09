@@ -1,0 +1,63 @@
+# Query API 파드. Deployment 대신 Rollout으로 blue-green 배포한다.
+# 새 버전(green)을 따로 띄워 preview로 확인한 뒤, 승격하면 active Service가 한 번에 green으로 넘어간다.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: query-api
+  labels:
+    app.kubernetes.io/name: query-api
+    app.kubernetes.io/part-of: dangubi
+spec:
+  # TODO: 레플리카 수
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: query-api
+  strategy:
+    blueGreen:
+      activeService: query-api-active
+      previewService: query-api-preview
+      # TODO: 자동 승격 여부. false면 사람이 확인 후 승격한다 (kubectl argo rollouts promote).
+      autoPromotionEnabled: false
+      # TODO: 승격 후 이전 버전(blue)을 몇 초 뒤에 내릴지 (롤백 여유)
+      scaleDownDelaySeconds: 30
+      # TODO: 자동 검증을 쓰면 prePromotionAnalysis / postPromotionAnalysis를 추가한다.
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: query-api
+        app.kubernetes.io/part-of: dangubi
+    spec:
+      containers:
+        - name: query-api
+          # TODO: GHCR 이미지 경로와 태그
+          image: ghcr.io/pika-chew/CHANGE_ME:CHANGE_ME
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: query-api-config
+          env:
+            - name: SPRING_DATA_MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: query-mongo-cred
+                  key: uri
+          # 필수: dangubi 네임스페이스 ResourceQuota 때문에 requests·limits가 없으면 파드가 생성되지 않는다.
+          # blue-green은 전환 중 파드가 두 배로 뜨므로 quota 여유를 함께 계산한다.
+          resources:
+            requests:
+              cpu: CHANGE_ME
+              memory: CHANGE_ME
+            limits:
+              memory: CHANGE_ME
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+      # TODO: 노드 분산 (topologySpreadConstraints)

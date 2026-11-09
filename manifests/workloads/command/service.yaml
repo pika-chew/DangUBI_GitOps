@@ -1,0 +1,16 @@
+# Command API 접속 주소.
+apiVersion: v1
+kind: Service
+metadata:
+  name: command-api
+  labels:
+    app.kubernetes.io/name: command-api
+spec:
+  # TODO: 외부 노출 방식. 클러스터 내부만이면 ClusterIP, MetalLB로 외부 IP를 받으려면 LoadBalancer.
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: command-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

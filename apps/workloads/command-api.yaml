@@ -1,0 +1,26 @@
+# Command API(Spring) Application.
+# 점수 테이블과 outbox를 MySQL에 한 트랜잭션으로 쓴다. Kafka 발행은 Debezium이 하므로 이 앱은 Kafka에 직접 붙지 않는다.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-command-api
+  namespace: argocd
+  annotations:
+    # wave 3: MySQL(0), Kafka(1), Kafka Connect(2)가 뜬 뒤에 올라온다.
+    argocd.argoproj.io/sync-wave: "3"
+    # TODO: 이미지 태그 자동 갱신(Argo CD Image Updater 등)을 쓰면 여기에 주석을 추가한다.
+spec:
+  project: dangubi-workloads
+  source:
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+    targetRevision: main
+    path: manifests/workloads/command
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dangubi
+  syncPolicy:
+    automated:
+      # TODO: 무상태 앱이라 prune true를 기본으로 둔다. 정책이 다르면 바꾼다.
+      prune: true
+      selfHeal: true
+    # TODO: 필요하면 syncOptions, retry를 추가한다 (apps/data/kafka-connect.yaml 참고).

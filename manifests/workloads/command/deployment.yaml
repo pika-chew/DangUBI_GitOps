@@ -1,0 +1,59 @@
+# Command API 파드. 쓰기 전용 API로, 요청을 받아 MySQL에 점수 + outbox를 한 트랜잭션으로 저장한다.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: command-api
+  labels:
+    app.kubernetes.io/name: command-api
+    app.kubernetes.io/part-of: dangubi
+spec:
+  # TODO: 레플리카 수 (가용성 vs 자원)
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: command-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: command-api
+        app.kubernetes.io/part-of: dangubi
+    spec:
+      containers:
+        - name: command-api
+          # TODO: GHCR 이미지 경로와 태그 (태그 자동 갱신 방식에 맞춘다)
+          image: ghcr.io/pika-chew/CHANGE_ME:CHANGE_ME
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: command-api-config
+          env:
+            # Vault → ExternalSecret으로 만든 Secret에서 DB 계정을 읽는다.
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: command-mysql-cred
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: command-mysql-cred
+                  key: password
+          # 필수: dangubi 네임스페이스 ResourceQuota 때문에 CPU·메모리 requests와 메모리 limits가 없으면 파드가 생성되지 않는다.
+          resources:
+            requests:
+              cpu: CHANGE_ME
+              memory: CHANGE_ME
+            limits:
+              memory: CHANGE_ME
+          # TODO: Spring Boot Actuator 경로에 맞춘다.
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+      # TODO: 노드 분산 (Kafka처럼 topologySpreadConstraints, topologyKey: kubernetes.io/hostname)

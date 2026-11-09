@@ -1,0 +1,10 @@
+# 주기 작업 묶음. apps/workloads/cronjob.yaml이 이 경로를 동기화한다.
+# 작업 하나당 파일 하나로 추가한다.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: dangubi
+
+resources:
+  - outbox-cleanup.yaml   # Debezium이 읽어 간 오래된 outbox 행 삭제
+  # TODO: 다른 주기 작업이 생기면 여기에 추가한다.
