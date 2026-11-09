@@ -78,4 +78,12 @@ spec:
   entityOperator:
     # KafkaTopic CR을 실제 토픽으로 만드는 Topic Operator만 켠다.
     # KafkaUser를 쓰지 않으므로 User Operator는 생략해 자원을 아낀다.
-    topicOperator: {}
+    topicOperator:
+      # 필수: dangubi-data ResourceQuota 때문에 requests·limits가 없으면 파드가 생성되지 않는다.
+      # 토픽 5개만 관리해서 가볍다.
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 512Mi

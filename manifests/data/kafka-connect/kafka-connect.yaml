@@ -54,6 +54,14 @@ spec:
 
   # Strimzi가 플러그인을 넣은 Connect 이미지를 직접 빌드해 GHCR에 push하고, push된 digest로 pull한다.
   build:
+    # 필수: dangubi-data ResourceQuota 때문에 requests·limits가 없으면 빌드 파드가 생성되지 않는다.
+    # 이미지를 만드는 동안만 잠깐 뜨는 파드라 넉넉히 잡는다.
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
     output:
       type: docker
       image: ghcr.io/pika-chew/dangubi-connect:latest
