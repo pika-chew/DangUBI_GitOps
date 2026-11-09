@@ -27,3 +27,18 @@ provisioner: kubernetes.io/no-provisioner
 reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: false
+---
+# KafkaNodePool의 PVC는 이 클래스를 사용하는 정적 local PV에 바인딩된다.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-kafka
+  labels:
+    app.kubernetes.io/part-of: dangubi
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+provisioner: kubernetes.io/no-provisioner
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: false
