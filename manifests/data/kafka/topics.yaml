@@ -11,7 +11,7 @@ metadata:
 # Debezium Event Router와 반드시 일치해야 한다.(connector-debezium-outbox.yaml 참고)
 spec:
   topicName: outbox.vehicle_summary
-  # 키(vehicle_id) 기준으로 파티션이 정해져 차량별 순서가 보장된다. Sink tasksMax 3과 맞춘다.
+  # 키(vehicle_id) 기준으로 파티션이 정해져 차량별 순서가 보장된다.
   partitions: 3
   replicas: 3
   config:

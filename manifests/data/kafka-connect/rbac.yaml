@@ -1,5 +1,4 @@
-# Connect 워커가 커넥터 설정의 ${secrets:...} 참조를 풀 수 있도록 Secret 읽기 권한을 준다.
-# (KubernetesSecretConfigProvider는 워커의 ServiceAccount 권한으로 Secret을 읽는다.)
+# Connect 워커가 커넥터 설정 참조를 풀 수 있도록 Secret 읽기 권한을 준다.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -26,7 +25,6 @@ roleRef:
   kind: Role
   name: dangubi-connect-secret-reader
 subjects:
-  # Strimzi가 만드는 Connect 워커 ServiceAccount 이름은 "<KafkaConnect 이름>-connect"다.
   - kind: ServiceAccount
     name: dangubi-connect-connect
     namespace: dangubi-data
