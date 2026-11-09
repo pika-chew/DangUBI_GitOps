@@ -1,15 +1,15 @@
-# Command API 접속 주소.
+# Collector API 접속 주소.
 apiVersion: v1
 kind: Service
 metadata:
-  name: command-api
+  name: collector-api
   labels:
-    app.kubernetes.io/name: command-api
+    app.kubernetes.io/name: collector-api
 spec:
   # TODO: 외부 노출 방식. 클러스터 내부만이면 ClusterIP, MetalLB로 외부 IP를 받으려면 LoadBalancer.
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: command-api
+    app.kubernetes.io/name: collector-api
   ports:
     - name: http
       port: 80

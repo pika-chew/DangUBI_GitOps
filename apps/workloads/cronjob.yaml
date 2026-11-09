@@ -1,5 +1,5 @@
 # 주기 작업(CronJob) Application.
-# Command·Query와 배포 주기가 달라 앱을 따로 둔다.
+# Collector·Query와 배포 주기가 달라 앱을 따로 둔다.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

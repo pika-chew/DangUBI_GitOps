@@ -1,25 +1,26 @@
-# Command API 파드. 쓰기 전용 API로, 요청을 받아 MySQL에 점수 + outbox를 한 트랜잭션으로 저장한다.
+# Collector API 파드. 차량 주행 데이터를 받아 MySQL에 저장하는 수집 API다.
+# TODO: 점수 계산과 outbox 기록을 이 앱이 하는지, 다른 곳(배치 등)이 하는지 정한다.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: command-api
+  name: collector-api
   labels:
-    app.kubernetes.io/name: command-api
+    app.kubernetes.io/name: collector-api
     app.kubernetes.io/part-of: dangubi
 spec:
   # TODO: 레플리카 수 (가용성 vs 자원)
   replicas: 2
   selector:
     matchLabels:
-      app.kubernetes.io/name: command-api
+      app.kubernetes.io/name: collector-api
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: command-api
+        app.kubernetes.io/name: collector-api
         app.kubernetes.io/part-of: dangubi
     spec:
       containers:
-        - name: command-api
+        - name: collector-api
           # TODO: GHCR 이미지 경로와 태그 (태그 자동 갱신 방식에 맞춘다)
           image: ghcr.io/pika-chew/CHANGE_ME:CHANGE_ME
           ports:
@@ -27,18 +28,18 @@ spec:
               containerPort: 8080
           envFrom:
             - configMapRef:
-                name: command-api-config
+                name: collector-api-config
           env:
             # Vault → ExternalSecret으로 만든 Secret에서 DB 계정을 읽는다.
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: command-mysql-cred
+                  name: collector-mysql-cred
                   key: username
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: command-mysql-cred
+                  name: collector-mysql-cred
                   key: password
           # 필수: dangubi 네임스페이스 ResourceQuota 때문에 CPU·메모리 requests와 메모리 limits가 없으면 파드가 생성되지 않는다.
           resources:

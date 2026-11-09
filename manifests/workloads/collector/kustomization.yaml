@@ -1,4 +1,4 @@
-# Command API 매니페스트 묶음. apps/workloads/command-api.yaml이 이 경로를 동기화한다.
+# Collector API 매니페스트 묶음. apps/workloads/collector-api.yaml이 이 경로를 동기화한다.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 

@@ -1,9 +1,8 @@
-# Command API(Spring) Application.
-# 점수 테이블과 outbox를 MySQL에 한 트랜잭션으로 쓴다. Kafka 발행은 Debezium이 하므로 이 앱은 Kafka에 직접 붙지 않는다.
+# Collector API(Spring) Application.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dangubi-command-api
+  name: dangubi-collector-api
   namespace: argocd
   annotations:
     # wave 3: MySQL(0), Kafka(1), Kafka Connect(2)가 뜬 뒤에 올라온다.
@@ -14,7 +13,7 @@ spec:
   source:
     repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
     targetRevision: main
-    path: manifests/workloads/command
+    path: manifests/workloads/collector
   destination:
     server: https://kubernetes.default.svc
     namespace: dangubi

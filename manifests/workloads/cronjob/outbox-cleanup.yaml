@@ -27,13 +27,13 @@ spec:
           restartPolicy: Never
           containers:
             - name: outbox-cleanup
-              # TODO: 실행 이미지 (mysql 클라이언트 이미지 + SQL, 또는 Command 이미지의 정리 명령)
+              # TODO: 실행 이미지 (mysql 클라이언트 이미지 + SQL, 또는 Collector 이미지의 정리 명령)
               image: CHANGE_ME
               # TODO: 실행 명령. 예: 보존 기간(N일)이 지난 outbox 행을 나눠서(batch) DELETE.
               #       Debezium이 아직 못 읽은 행을 지우지 않도록 보존 기간을 넉넉히 둔다.
               command: ["CHANGE_ME"]
-              # TODO: MySQL 계정. Command 계정 Secret(command-mysql-cred)을 같이 쓸지, 정리 전용 계정을 둘지 정한다.
-              #       다른 앱(command-api)이 만든 Secret에 기대면 그 앱이 먼저 떠 있어야 한다.
+              # TODO: MySQL 계정. Collector 계정 Secret(collector-mysql-cred)을 같이 쓸지, 정리 전용 계정을 둘지 정한다.
+              #       다른 앱(collector-api)이 만든 Secret에 기대면 그 앱이 먼저 떠 있어야 한다.
               # 필수: dangubi 네임스페이스 ResourceQuota 때문에 requests·limits가 없으면 Job 파드가 생성되지 않는다.
               resources:
                 requests:
