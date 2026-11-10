@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-mysql-operator
+  namespace: argocd
+  annotations:
+    # 플랫폼 네임스페이스 다음, MySQL 클러스터 앱보다 먼저 등록한다.
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  project: dangubi-infra
+  sources:
+    - repoURL: https://mysql.github.io/mysql-operator/
+      chart: mysql-operator
+      targetRevision: 2.3.1
+      helm:
+        releaseName: dangubi-mysql-operator
+        valueFiles:
+          - $values/helm/mysql-operator/values.yaml
+    - repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mysql-operator
+  syncPolicy:
+    automated:
+      # CRD를 Git에서 제거할 때 운영 중인 MySQL 리소스가 자동 삭제되지 않도록 한다.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

@@ -51,3 +51,13 @@ metadata:
   annotations:
     # Secret 동기화 컨트롤러가 실행되는 네임스페이스를 보존한다.
     argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mysql-operator
+  labels:
+    app.kubernetes.io/part-of: dangubi
+  annotations:
+    # MySQL 클러스터를 관리하는 컨트롤러의 네임스페이스를 보존한다.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false

@@ -10,6 +10,7 @@ spec:
     - https://github.com/pika-chew/DangUBI_GitOps.git
     - https://kubernetes.github.io/cloud-provider-openstack
     - https://charts.external-secrets.io
+    - https://mysql.github.io/mysql-operator/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: kube-system
@@ -19,6 +20,8 @@ spec:
       namespace: argo-rollouts
     - server: https://kubernetes.default.svc
       namespace: external-secrets
+    - server: https://kubernetes.default.svc
+      namespace: mysql-operator
     - server: https://kubernetes.default.svc
       namespace: dangubi-data
     - server: https://kubernetes.default.svc
