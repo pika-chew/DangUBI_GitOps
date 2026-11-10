@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-router
+  namespace: dangubi-data
+spec:
+  type: ClusterIP
+  selector:
+    mysql.oracle.com/cluster: dangubi-mysql
+    component: mysqlrouter
+  ports:
+    # Debezium이 사용하는 3306을 Router의 클래식 읽기·쓰기 포트에 연결한다.
+    - name: mysql
+      port: 3306
+      targetPort: mysqlrw

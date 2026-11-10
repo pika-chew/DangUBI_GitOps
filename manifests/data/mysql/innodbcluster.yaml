@@ -1,0 +1,92 @@
+apiVersion: mysql.oracle.com/v2
+kind: InnoDBCluster
+metadata:
+  name: dangubi-mysql
+  namespace: dangubi-data
+spec:
+  edition: community
+  version: "8.4.13"
+  # 초기 관리자 계정은 배포 전에 별도 Secret으로 준비한다.
+  secretName: dangubi-mysql-root
+  tlsUseSelfSigned: true
+  instances: 3
+  datadirVolumeClaimTemplate:
+    # 0번은 사전 생성한 PVC를 재사용한다. 이 템플릿은 나머지 멤버에 적용된다.
+    storageClassName: cinder-retain
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 20Gi
+  mycnf: |
+    [mysqld]
+    binlog_row_image=FULL
+  datadirPermissions:
+    setRightsUsingInitContainer: true
+  podSpec:
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                mysql.oracle.com/cluster: dangubi-mysql
+                component: mysqld
+    # 데이터 네임스페이스의 ResourceQuota는 초기화·보조 컨테이너에도 적용된다.
+    initContainers:
+      - name: fixdatadir
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+      - name: initconf
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+      - name: initmysql
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            memory: 1Gi
+    containers:
+      - name: mysql
+        resources:
+          requests:
+            cpu: "1"
+            memory: 4Gi
+          limits:
+            memory: 4Gi
+      - name: sidecar
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+  router:
+    instances: 2
+    version: "8.4.13"
+    podSpec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  mysql.oracle.com/cluster: dangubi-mysql
+                  component: mysqlrouter
+      containers:
+        - name: router
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi

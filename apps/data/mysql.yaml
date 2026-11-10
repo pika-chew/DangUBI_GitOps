@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-mysql
+  namespace: argocd
+  annotations:
+    # MySQL Operator 다음, Kafka Connect보다 먼저 등록한다.
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: dangubi-data
+  source:
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+    targetRevision: main
+    path: manifests/data/mysql
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dangubi-data
+  # 최초에는 cmp1 PVC와 초기 계정 Secret을 확인한 뒤 수동 동기화한다.
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
