@@ -1,0 +1,14 @@
+# collector (Deployment)
+# - 역할: 차량 주행 데이터를 받아 MySQL에 저장하는 수집 API 파드.
+# - 정할 것: 점수 계산과 outbox 기록을 이 앱이 하는지, 배치(daily-pipeline 등)가 하는지
+# - 채울 것:
+#   - replicas, 라벨·셀렉터
+#   - 이미지(GHCR 경로·태그), 포트
+#   - 설정: envFrom collector-config / 계정: collector-mysql-cred Secret
+#   - resources: requests(cpu, memory) + limits(memory) 필수 — dangubi ResourceQuota 때문에 없으면 파드가 생성되지 않는다
+#   - readiness/liveness probe (Spring Actuator)
+#   - 노드 분산 (topologySpreadConstraints, kubernetes.io/hostname)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector

@@ -9,6 +9,7 @@ spec:
     # 외부 chart를 도입할 때 해당 저장소 URL을 추가한다.
     - https://github.com/pika-chew/DangUBI_GitOps.git
     - https://kubernetes.github.io/cloud-provider-openstack
+    - https://metallb.github.io/metallb
     - https://charts.external-secrets.io
   destinations:
     - server: https://kubernetes.default.svc

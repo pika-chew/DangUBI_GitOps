@@ -1,0 +1,12 @@
+# Collector 매니페스트 묶음. apps/workloads/collector.yaml이 이 경로를 동기화한다.
+# - 채울 것: 외부 노출이 필요하면 Ingress 등 추가, 필요하면 PodDisruptionBudget·HPA 추가
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: dangubi
+
+resources:
+  - externalsecret.yaml   # MySQL 접속 계정 (Vault → Secret)
+  - configmap.yaml        # 비밀이 아닌 설정
+  - deployment.yaml       # API 파드
+  - service.yaml          # 접속 주소

@@ -1,0 +1,7 @@
+# collector-config (ConfigMap)
+# - 역할: Collector의 비밀이 아닌 설정. 비밀번호는 collector-mysql-cred Secret으로 따로 넣는다.
+# - 채울 것: SPRING_PROFILES_ACTIVE, SPRING_DATASOURCE_URL(MySQL Router RW 주소, MySQL 담당과 확인), 그 밖의 환경별 설정
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-config

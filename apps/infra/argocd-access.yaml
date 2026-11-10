@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-argocd-access
+  namespace: argocd
+  annotations:
+    # MetalLB IP 풀 이후에 등록한다.
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  project: dangubi-argocd-access
+  source:
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+    targetRevision: main
+    path: manifests/infra/argocd-access
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

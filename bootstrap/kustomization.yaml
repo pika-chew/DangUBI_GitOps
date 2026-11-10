@@ -5,4 +5,5 @@ resources:
   - infra-project.yaml
   - data-project.yaml
   - workloads-project.yaml
+  - argocd-access-project.yaml
   - root-app.yaml

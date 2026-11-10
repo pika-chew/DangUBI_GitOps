@@ -1,0 +1,12 @@
+# cleanup (CronJob) — 매일 06:00, suspend false
+# - 역할: 배치 앱으로 cleanupJob을 실행한다. 03:00 파이프라인 뒤에 돌아 처리가 끝난 데이터를 정리한다.
+#   시간으로만 순서를 맞추므로, 파이프라인이 06:00을 넘기면 겹칠 수 있다.
+#   반드시 파이프라인 뒤여야 하면 dailyPipelineJob 끝 Step으로 넣는 방법도 있다.
+# - outbox 정리를 여기서 한다면: Debezium이 아직 못 읽은 행을 지우지 않게 보존 기간을 넉넉히 둔다.
+#   (지워도 Kafka에는 영향 없음: tombstones.on.delete=false, Event Router는 DELETE를 무시)
+# - 채울 것: schedule "0 6 * * *", timeZone, concurrencyPolicy, 재시도,
+#           args --spring.batch.job.name=cleanupJob, 정리 대상·보존 기간, 이미지, envFrom, resources(quota 필수)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup
