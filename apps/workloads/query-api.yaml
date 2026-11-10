@@ -23,7 +23,6 @@ spec:
       # 그 전에 동기화되면 배포 전 검사(dry-run)가 실패하므로, 등록 전에는 검사만 건너뛴다.
       - SkipDryRunOnMissingResource=true
     retry:
-      # 컨트롤러가 늦게 뜨는 동안의 적용 실패를 재시도로 흡수한다. 30s → 1m → 2m → 4m → 5m(상한), 최대 10회.
       limit: 10
       backoff:
         duration: 30s

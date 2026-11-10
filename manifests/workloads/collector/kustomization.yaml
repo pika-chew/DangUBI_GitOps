@@ -10,9 +10,6 @@ resources:
   - deployment.yaml       # API 파드
   # - service.yaml        # 현재 사용 안 함 (SQS 워커라 들어오는 요청 없음, 이유는 파일 상단 참고)
 
-# 이미지 주소·태그는 이 한 곳에서 정한다. deployment.yaml의 image: dangubi-be-collector가 빌드 때 아래 값으로 바뀐다.
-# 새 버전 배포 = newTag 줄만 바꿔 커밋. CI로 자동화할 때는 그 줄만 바꾸는 방식(예: sed)을 쓴다.
-# (`kustomize edit set image`는 파일 전체를 다시 써서 주석과 들여쓰기가 사라진다)
 images:
   - name: dangubi-be-collector
     newName: ghcr.io/pika-chew/dangubi-be-collector
