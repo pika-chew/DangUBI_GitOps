@@ -13,6 +13,8 @@ metadata:
     metallb.io/loadBalancerIPs: 172.16.10.201
 spec:
   type: LoadBalancer
+  # MetalLB L2는 VIP로 직접 받으므로 NodePort가 필요 없다. 모든 노드에 우회 경로가 열리지 않게 한다.
+  allocateLoadBalancerNodePorts: false
   selector:
     app.kubernetes.io/name: argocd-server
   # HTTP 80은 노출하지 않는다. argocd-server는 8080에서 HTTPS·gRPC를 함께 처리한다.
