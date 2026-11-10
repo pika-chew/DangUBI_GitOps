@@ -4,6 +4,11 @@
 # - 작업 하나 = CronJob 하나. 서로를 부르거나 묶지 않는다.
 # - 순서(백업 02:00 → 파이프라인 03:00 → 정리 06:00)는 시간으로만 맞춘다. 앞 작업이 끝났는지는 확인하지 않는다.
 #   "앞 단계가 끝나야 다음 단계"가 필요하면 배치 앱의 한 Job 안에 Step으로 묶는다.
+# - 하루 묶음(정합성 검토 → 적재 → 점수 계산)은 daily-pipeline 하나가 dailyPipelineJob으로 실행한다.
+#   reconcile·ingest·score는 각 단계를 따로 테스트하기 위한 Job 틀이다 (suspend, 스스로 돌지 않음).
+#   실행: kubectl -n dangubi create job --from=cronjob/<이름> <이름>-manual-$(date +%s)
+# - Job이 아니라 CronJob(suspend)으로 두는 이유: Job은 Argo CD가 동기화로 만드는 순간 한 번 실행되고 끝난다.
+#   다시 돌릴 수 없고, 지우면 selfHeal이 다시 만들어 또 실행한다. CronJob은 틀만 보관하고 --from으로 몇 번이든 찍어 낸다.
 # - 배치 앱 작업 6개는 같은 이미지에 실행할 Job 이름(args)만 다르다.
 # - manual/ 폴더는 테스트 때 손으로 한 번 실행하는 Job이라 resources에 넣지 않는다 (Argo CD가 동기화하지 않음).
 #
@@ -23,7 +28,7 @@ resources:
   - daily-pipeline.yaml         # 매일 03:00
   - monthly-finalize.yaml       # 매월 1일 05:00
   - cleanup.yaml                # 매일 06:00
-  # 수동 실행 전용 (suspend: true)
+  # 테스트용 Job 틀 (suspend: true, daily-pipeline 묶음의 각 단계)
   - reconcile.yaml
   - ingest.yaml
   - score.yaml

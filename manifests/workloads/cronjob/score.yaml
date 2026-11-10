@@ -1,8 +1,11 @@
-# score (CronJob) — 수동 실행 전용, suspend true
-# - 역할: 배치 앱으로 scoreJob을 실행한다. daily-pipeline의 한 단계만 따로 다시 돌릴 때 쓰는 용도로 보인다.
+# score (CronJob) — 테스트용 Job 틀, suspend true
+# - 역할: 점수 계산(scoreJob)만 따로 실행하는 틀. 스케줄로는 돌지 않는다.
+#   운영에서는 daily-pipeline이 묶음의 3단계로 실행한다.
 # - 실행: kubectl -n dangubi create job --from=cronjob/score score-manual-$(date +%s)
 # - 채울 것: suspend true, 오지 않는 날짜 schedule(reconcile.yaml 참고),
-#           args --spring.batch.job.name=scoreJob, Job 파라미터, 이미지, envFrom, resources(quota 필수)
+#           args --spring.batch.job.name=scoreJob, Job 파라미터, 이미지, envFrom, resources(quota 필수),
+#           ttlSecondsAfterFinished
+# - 초안: daily-pipeline.yaml을 복사해 이름, suspend, schedule, Job 이름만 바꾼다
 apiVersion: batch/v1
 kind: CronJob
 metadata:
