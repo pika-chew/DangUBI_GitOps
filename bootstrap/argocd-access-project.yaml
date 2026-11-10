@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dangubi-argocd-access
+  namespace: argocd
+spec:
+  description: Argo CD UI 접속용 LoadBalancer Service 관리
+  sourceRepos:
+    - https://github.com/pika-chew/DangUBI_GitOps.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+  # argocd 네임스페이스의 Secret·ConfigMap·RBAC은 다루지 않도록 Service만 허용한다.
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: Service
