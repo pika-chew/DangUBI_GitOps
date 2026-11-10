@@ -1,5 +1,5 @@
 # Argo CD UI 전용 VIP. Neutron에서 같은 IP의 포트를 예약하고,
-# Worker 4대의 포트에 허용 주소 쌍 172.16.10.100/32를 등록해야 트래픽이 전달된다.
+# Worker 4대의 포트에 허용 주소 쌍 172.16.10.201/32를 등록해야 트래픽이 전달된다.
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -11,7 +11,7 @@ metadata:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   addresses:
-    - 172.16.10.100/32
+    - 172.16.10.201/32
   # 다른 LoadBalancer Service가 이 VIP를 자동으로 가져가지 않게 한다.
   autoAssign: false
 ---

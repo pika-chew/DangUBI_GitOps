@@ -10,7 +10,7 @@ metadata:
   name: argocd-server-lb
   namespace: argocd
   annotations:
-    metallb.io/loadBalancerIPs: 172.16.10.100
+    metallb.io/loadBalancerIPs: 172.16.10.201
 spec:
   type: LoadBalancer
   selector:
