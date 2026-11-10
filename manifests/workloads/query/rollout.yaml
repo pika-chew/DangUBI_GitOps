@@ -1,0 +1,14 @@
+# query-api (Argo Rollouts Rollout)
+# - 역할: Query API 파드. Deployment 대신 Rollout으로 blue-green 배포한다.
+#   새 버전(green)을 따로 띄워 preview로 확인하고, 승격하면 active Service가 한 번에 green으로 넘어간다.
+# - 채울 것:
+#   - replicas, 라벨·셀렉터
+#   - strategy.blueGreen: activeService(query-api-active), previewService(query-api-preview),
+#     autoPromotionEnabled(자동/수동 승격), scaleDownDelaySeconds(이전 버전 유지 시간), 필요하면 Analysis
+#   - 이미지, 포트, envFrom query-api-config, query-mongo-cred Secret
+#   - resources 필수 (dangubi ResourceQuota). 전환 중 파드가 두 배로 뜨므로 quota 여유를 함께 계산한다
+#   - readiness/liveness probe, 노드 분산
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: query-api

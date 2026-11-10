@@ -1,0 +1,7 @@
+# query-api-config (ConfigMap)
+# - 역할: Query의 비밀이 아닌 설정. MongoDB 접속 URI는 query-mongo-cred Secret으로 따로 넣는다.
+# - 채울 것: SPRING_PROFILES_ACTIVE, 읽기 모델 DB 이름(Mongo Sink의 database와 같아야 함, 현재 ubi_read), 그 밖의 설정
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: query-api-config

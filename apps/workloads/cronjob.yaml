@@ -1,0 +1,13 @@
+# dangubi-cronjob (Argo CD Application)
+# - 역할: manifests/workloads/cronjob/를 동기화한다. 배치 작업(CronJob) 묶음.
+#   Collector·Query와 배포 주기가 달라 앱을 따로 둔다.
+# - 채울 것:
+#   - sync-wave: 3 (작업 대상인 MySQL·MongoDB 다음)
+#   - project: dangubi-workloads / destination namespace: dangubi
+#   - source: GitOps 저장소, targetRevision main, path manifests/workloads/cronjob
+#   - syncPolicy: automated(prune, selfHeal)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-cronjob
+  namespace: argocd

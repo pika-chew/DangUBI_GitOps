@@ -1,0 +1,13 @@
+# blue-green용 Service 2개. 셀렉터는 Argo Rollouts가 배포 중에 자동으로 바꾼다.
+# - query-api-active : 실제 사용자 트래픽이 가는 쪽 (현재 버전)
+# - query-api-preview: 새 버전을 승격 전에 미리 확인하는 쪽
+# - 채울 것: type(active는 외부 노출 방식에 맞춰 ClusterIP/LoadBalancer), selector, ports
+apiVersion: v1
+kind: Service
+metadata:
+  name: query-api-active
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: query-api-preview

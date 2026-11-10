@@ -1,0 +1,13 @@
+# dangubi-collector (Argo CD Application)
+# - 역할: manifests/workloads/collector/를 동기화한다. 차량 주행 데이터를 수집하는 API.
+# - 채울 것:
+#   - sync-wave: 3 (MySQL 0 → Kafka 1 → Connect 2 다음)
+#   - project: dangubi-workloads / destination namespace: dangubi
+#   - source: GitOps 저장소, targetRevision main, path manifests/workloads/collector
+#   - syncPolicy: automated(prune, selfHeal), 필요하면 retry
+#   - 이미지 태그 자동 갱신을 쓰면 그 주석
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-collector
+  namespace: argocd
