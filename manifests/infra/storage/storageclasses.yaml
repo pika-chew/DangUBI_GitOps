@@ -14,6 +14,24 @@ reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 ---
+# cmp1 백엔드를 요청하는 MySQL 멤버의 PVC에서 이 클래스를 사용한다.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: cinder-mysql-cmp1
+  labels:
+    app.kubernetes.io/part-of: dangubi
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+provisioner: cinder.csi.openstack.org
+parameters:
+  type: lvm-os-cmp1
+  csi.storage.k8s.io/fstype: ext4
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:

@@ -6,24 +6,26 @@
   이 chart의 기본 드라이버 이미지는 v1.36.0이며 Kubernetes 1.36과 같은 minor 버전이다.
 - `helm/cinder-csi/values.yaml`: 전용 Secret 참조, Worker의 controller 2개와 node DaemonSet을 설정한다.
 - `apps/infra/storage.yaml`: StorageClass와 Kafka·MongoDB의 정적 local PV를 별도 Application으로 관리한다.
-- MySQL의 백엔드별 StorageClass는 별도로 구성한다.
+- MySQL의 cmp1 배치용 StorageClass는 `cinder-mysql-cmp1`을 사용한다.
 
 | StorageClass | 용도 | 프로비저닝 | PVC 삭제 후 |
 | --- | --- | --- | --- |
 | `cinder-retain` | Cinder 동적 볼륨 | Cinder CSI | PV·볼륨 보존 |
+| `cinder-mysql-cmp1` | MySQL의 cmp1 배치용 | Cinder CSI (`lvm-os-cmp1` 타입) | PV·볼륨 보존 |
 | `local-retain` | Worker 로컬 디스크 | 정적 PV 별도 생성 | PV·데이터 보존 |
 | `local-kafka` | Kafka 브로커 전용 | Worker별 정적 PV | PV·데이터 보존 |
 | `local-mongodb` | MongoDB 멤버 전용 | Worker별 정적 PV | PV·데이터 보존 |
 
-네 클래스 모두 기본값으로 지정하지 않는다. PVC에 `storageClassName`을 명시한다.
+PVC에 사용할 클래스를 `storageClassName`으로 명시한다.
 `WaitForFirstConsumer`는 Pod 배치 조건을 고려하도록 바인딩·볼륨 생성을 늦춘다.
 PVC만 생성한 시점의 `Pending`은 이 모드에서 반드시 오류를 의미하지는 않는다.
 `cinder-retain`은 확장을 허용하지만 실제 Cinder 백엔드와 파일시스템의 지원 여부를 확인해야 한다.
 local PV의 용량 변경과 노드 간 데이터 이동은 자동 처리되지 않는다.
 
-공통 Cinder 클래스에는 미확인 `availability`·`type`·`allowedTopologies`를 지정하지 않는다.
-MySQL A/B의 물리 백엔드 분리를 보장하는 클래스가 아니므로 해당 용도로 사용하기 전에
-Cinder/Nova AZ, volume type과 실제 백엔드 배치를 확인해 별도 클래스를 작성한다.
+공통 `cinder-retain`은 Cinder의 기본 볼륨 타입을 사용한다. MySQL의 cmp1 배치용 PVC는
+`cinder-mysql-cmp1`을 사용해 Horizon에서 확인한 `lvm-os-cmp1` 타입을 요청한다.
+해당 타입의 `volume_backend_name`은 `lvm-os-cmp1`이다. 이 백엔드 이름을 사용하는 호스트가
+cmp1 하나인지 확인하고, 실제 생성된 볼륨의 호스트도 확인한다.
 local PV는 노드별 실제 마운트 경로·용량과 nodeAffinity를 확인한 뒤 추가한다.
 
 ## 인증 정보 준비
@@ -79,7 +81,7 @@ kctl -n kube-system rollout status daemonset/cinder-csi-nodeplugin --timeout=300
 kctl get csidriver cinder.csi.openstack.org
 kctl get csinodes
 kctl get nodes -L topology.cinder.csi.openstack.org/zone
-kctl get storageclass cinder-retain local-retain local-kafka local-mongodb
+kctl get storageclass cinder-retain cinder-mysql-cmp1 local-retain local-kafka local-mongodb
 ```
 
 controller는 서로 다른 Worker에 2개, node plugin은 Worker 4대에 1개씩 실행한다.
@@ -103,6 +105,10 @@ StorageClass 생성과 CSI Pod Ready만으로 볼륨 조작 성공을 확인할 
 3. Pod를 다시 생성해 같은 PVC의 데이터가 보존되는지 확인한다.
 4. 테스트 Pod와 PVC를 삭제하고 Retain으로 남는 PV·Cinder 볼륨 ID를 확인한다.
    불필요한 테스트 PV·볼륨은 데이터를 확인한 뒤 개별적으로 정리한다.
+
+cmp1 배치도 같은 절차로 확인하되 테스트 PVC에 `cinder-mysql-cmp1`을 지정한다.
+바인딩된 PV의 `spec.csi.volumeHandle`로 OpenStack 볼륨을 찾아 타입과 실제 백엔드 호스트를 확인한다.
+Horizon에서 호스트가 표시되지 않으면 OpenStack 담당자에게 볼륨 ID로 호스트 확인을 요청한다.
 
 ## Kafka local PV 준비와 확인
 
