@@ -10,6 +10,7 @@ spec:
     - https://github.com/pika-chew/DangUBI_GitOps.git
     - https://kubernetes.github.io/cloud-provider-openstack
     - https://metallb.github.io/metallb
+    - https://charts.external-secrets.io
   destinations:
     - server: https://kubernetes.default.svc
       namespace: kube-system
@@ -17,6 +18,8 @@ spec:
       namespace: metallb-system
     - server: https://kubernetes.default.svc
       namespace: argo-rollouts
+    - server: https://kubernetes.default.svc
+      namespace: external-secrets
     - server: https://kubernetes.default.svc
       namespace: dangubi-data
     - server: https://kubernetes.default.svc

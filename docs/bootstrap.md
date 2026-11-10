@@ -2,66 +2,46 @@
 
 ## 구성
 
-- `bootstrap/argocd/`: Argo CD v3.6.1 공식 설치 매니페스트를 참조한다.
-  초기 구성은 non-HA이며, Argo CD 자체의 고가용성 전환은 별도 작업이다.
+- Argo CD 설치와 업그레이드는 Ansible에서 관리한다.
 - `bootstrap/`: AppProject 4개와 부모 Application `dangubi-root`를 등록한다.
 - 부모는 이 레포의 `main` 브랜치에 있는 `apps/`를 재귀적으로 감시한다.
   기능 브랜치의 변경은 `main` 병합 후 반영된다.
 - `apps/infra/platform.yaml`은 `manifests/infra/platform/`의 네임스페이스와 자원 쿼터를 배포한다.
-
-Argo CD 3.6의 공식 테스트 대상에는 Kubernetes 1.36이 포함된다.
-설치 매니페스트는 이동하는 `stable` 대신 v3.6.1로 고정한다.
 
 ## 프로젝트와 배포 대상
 
 | AppProject | 배포 네임스페이스 | 담당 리소스 |
 | --- | --- | --- |
 | `dangubi-root` | `argocd` | 하위 Application만 |
-| `dangubi-infra` | `kube-system`, `metallb-system`, `argo-rollouts`, `dangubi-data`, `dangubi` | 플랫폼, Namespace, PV, StorageClass, CRD 등 |
+| `dangubi-infra` | `kube-system`, `metallb-system`, `argo-rollouts`, `external-secrets`, `dangubi-data`, `dangubi` | 플랫폼, Namespace, PV, StorageClass, CRD 등 |
 | `dangubi-data` | `dangubi-data` | MySQL, MongoDB, Kafka, Kafka Connect |
 | `dangubi-workloads` | `dangubi` | Command, Query |
 
 `dangubi`와 `dangubi-data`를 이후 A/B 작업의 기본 네임스페이스로 사용한다.
-Argo CD 설치 단계에서는 `argocd`만 생성한다. 업무·데이터 및 플랫폼 컨트롤러용
-네임스페이스는 `manifests/infra/platform/`에서 별도로 관리한다.
+AppProject와 부모 Application은 Ansible로 설치한 Argo CD의 `argocd` 네임스페이스에 등록한다.
+업무·데이터 및 플랫폼 컨트롤러용 네임스페이스는 `manifests/infra/platform/`에서 관리한다.
 
 하위 Application에는 위 표의 `spec.project`와 `spec.destination.namespace`를 지정한다.
 업무와 데이터 프로젝트는 클러스터 범위 리소스 및 ResourceQuota·LimitRange 변경을 허용하지 않는다.
 AppProject 이름에 `dangubi-`를 붙여 다른 프로젝트와 구분한다.
 
 root·data·workloads 프로젝트는 이 GitOps 레포만 허용한다.
-infra 프로젝트는 Cinder CSI 설치를 위해 공식 OpenStack chart 저장소도 허용한다.
+infra 프로젝트는 Cinder CSI와 External Secrets Operator의 공식 chart 저장소도 허용한다.
 외부 Helm chart를 추가로 도입할 때 해당 프로젝트에 정확한 chart 저장소 URL을 추가한다.
 Operator를 도입하면 컨트롤러·CRD는 infra에서, 클러스터 정의는 data에서 관리한다.
 Calico와 OpenStack CCM은 기존 Ansible에서 계속 관리한다.
 
-## 최초 설치
+## 적용 전 확인
 
-클러스터 관리자 권한의 kubeconfig가 있는 실행 노드에서 이 레포의 루트를 기준으로 실행한다.
-아래 명령은 실제 클러스터에 리소스를 생성한다. 먼저 현재 context와 대상 노드를 확인한다.
+Ansible로 Argo CD를 설치한 뒤 클러스터 관리자 권한의 kubeconfig가 있는 실행 노드에서
+이 레포의 루트를 기준으로 작업한다. 대상 클러스터, Argo CD 기동 상태와 필요한 CRD를 확인한다.
 
 ```sh
 kubectl config current-context
 kubectl get nodes
+kubectl -n argocd get deployments,statefulsets
+kubectl get crd applications.argoproj.io appprojects.argoproj.io
 ```
-
-Argo CD가 설치되지 않은 클러스터에 다음을 적용한다.
-이미 설치돼 있다면 버전과 설치 도구를 먼저 확인하고 기존 설치를 중복 관리하지 않는다.
-
-```sh
-kubectl apply --server-side -k bootstrap/argocd
-kubectl wait --for=condition=Established --timeout=120s \
-  crd/applications.argoproj.io \
-  crd/appprojects.argoproj.io \
-  crd/applicationsets.argoproj.io
-kubectl -n argocd rollout status deployment/argocd-redis --timeout=300s
-kubectl -n argocd rollout status deployment/argocd-repo-server --timeout=300s
-kubectl -n argocd rollout status deployment/argocd-server --timeout=300s
-kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=300s
-```
-
-큰 CRD의 클라이언트 측 annotation 크기 제한을 피하기 위해 설치는 server-side apply를 사용한다.
-필드 소유권 충돌이 발생하면 기존 관리 주체를 확인하고 해결한다.
 
 비공개 레포라면 root 등록 전에 Argo CD에 읽기용 인증 정보를 설정한다.
 인증 정보의 실제 값이나 kubeconfig는 Git에 커밋하지 않는다.
@@ -95,6 +75,7 @@ kubectl -n argocd describe application dangubi-root
 - `dangubi-data`: MySQL, MongoDB, Kafka, Kafka Connect
 - `metallb-system`: MetalLB
 - `argo-rollouts`: Argo Rollouts
+- `external-secrets`: External Secrets Operator
 
 기존 `kube-system`과 별도로 설치한 `argocd`는 이 Application에서 관리하지 않는다.
 여러 네임스페이스를 다루므로 Kustomize의 공통 `namespace` 변환은 사용하지 않는다.
@@ -162,12 +143,28 @@ LimitRange의 자동 기본값도 적용하지 않으므로 배포 파일에 자
 
 ```sh
 kubectl -n argocd get application dangubi-platform
-kubectl get namespace dangubi dangubi-data metallb-system argo-rollouts
+kubectl get namespace dangubi dangubi-data metallb-system argo-rollouts external-secrets
 kubectl -n dangubi-data describe resourcequota dangubi-data-compute
 kubectl -n dangubi describe resourcequota dangubi-workloads-compute
 ```
 
 다음 단계인 Cinder CSI와 공통 StorageClass의 구성·확인 절차는 [storage.md](storage.md)를 따른다.
+
+## External Secrets Operator
+
+`dangubi-external-secrets` Application은 공식 chart `2.14.0`으로 Operator, 검증 웹훅,
+인증서 컨트롤러와 CRD를 설치한다. 기존 Argo CD에는 병합 후 `kubectl apply -f bootstrap/infra-project.yaml`로
+chart 저장소와 대상 네임스페이스 허용을 반영한다. `dangubi-platform` 동기화로 `external-secrets`
+네임스페이스가 생겼는지 확인한 뒤 Operator의 준비 상태를 확인한다.
+
+```sh
+kubectl -n argocd get application dangubi-external-secrets
+kubectl -n external-secrets get deployments
+kubectl get crd externalsecrets.external-secrets.io clustersecretstores.external-secrets.io
+```
+
+Kafka Connect가 참조하는 `ClusterSecretStore/vault`와 실제 Vault 접속 설정은 별도로 구성한다.
+Secret 생성 여부는 Store가 준비된 뒤 `ExternalSecret`의 Ready 상태로 확인한다.
 
 ## 변경과 삭제
 
@@ -178,25 +175,20 @@ root는 자동 동기화와 self-heal을 활성화하고, 자식 Application의 
 
 `bootstrap/`은 root의 감시 대상이 아니다. AppProject나 root를 변경하면
 리뷰 후 `kubectl apply -k bootstrap`으로 재적용한다.
-Argo CD 자체의 설치 변경은 `kubectl apply --server-side -k bootstrap/argocd`로 별도 적용한다.
 AppProject의 권한 제한은 Git 쓰기 권한과 Argo CD 사용자 RBAC 설정을 대신하지 않는다.
 
 ## 로컬 확인
 
 ```sh
 kubectl kustomize bootstrap
-kubectl kustomize bootstrap/argocd
 kubectl kustomize manifests/infra/platform
 git diff --check
 ```
 
 첫 명령은 Application 1개와 AppProject 4개를 렌더링한다.
-두 번째 명령은 고정 버전의 공식 매니페스트를 가져오므로 GitHub 연결이 필요하다.
 렌더링 검증과 실제 클러스터의 기동·동기화 검증은 별도로 수행한다.
 
 ## 참고
 
-- [Argo CD installation](https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/)
-- [Argo CD v3.6.1](https://github.com/argoproj/argo-cd/releases/tag/v3.6.1)
 - [Declarative setup](https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/)
 - [Projects](https://argo-cd.readthedocs.io/en/stable/user-guide/projects/)
