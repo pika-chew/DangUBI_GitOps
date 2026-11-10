@@ -172,19 +172,87 @@ kctl -n dangubi-data get pvc,pod -l strimzi.io/cluster=dangubi-kafka -o wide
 ## MongoDB local PV 준비와 확인
 
 `k8s-worker-1`·`k8s-worker-2`·`k8s-worker-4`의 `/mnt/data/mongodb`를 각각 PV 하나에 연결한다.
-MongoDB를 배포할 때는 멤버별 PVC의 `storageClassName`을 `local-mongodb`, 요청 용량을 `20Gi`로 맞춘다.
+StatefulSet이 `local-mongodb` StorageClass를 사용하는 `20Gi` PVC를 멤버마다 하나씩 만든다.
 `20Gi`는 초기 검증용 PVC 매칭 용량이며, 공유 OS 디스크의 실제 사용량은 제한하지 않는다.
 
-동기화 전에 노드의 `kubernetes.io/hostname` 라벨과 `Ready` 상태를 확인한다.
-각 Worker에 MongoDB 전용 디렉터리를 준비하고, 배포에 사용할 이미지의 실행 UID·GID와 Pod 보안 설정에
-맞춰 쓰기 권한을 설정한다. Kafka가 함께 배치된 Worker 2·4에서는 두 서비스의 디스크 사용량을 함께 확인한다.
+동기화 전에 노드의 `Ready` 상태와 `kubernetes.io/hostname` 라벨을 확인한다. `dangubi-storage`를
+동기화한 뒤 MongoDB PV 3개가 준비됐는지 확인한다.
 
 ```sh
 kctl get nodes k8s-worker-1 k8s-worker-2 k8s-worker-4 -L kubernetes.io/hostname
-kctl get pv -l app.kubernetes.io/component=mongodb
+kctl get pv -l app.kubernetes.io/component=mongodb -o wide
 ```
 
-MongoDB를 배포한 후 멤버별 PVC가 각각 다른 PV에 바인딩되고, 데이터 디렉터리에 쓰기가 가능한지 확인한다.
+각 Worker에서 MongoDB 전용 디렉터리를 준비한다. 경로가 이미 있으면 기존 데이터와 소유권을
+먼저 확인한다. Kafka가 함께 배치된 Worker 2·4에서는 두 서비스의 디스크 사용량을 함께 확인한다.
+
+```sh
+sudo install -d -o 999 -g 999 -m 0750 /mnt/data/mongodb
+stat -c '%n %u:%g %a' /mnt/data/mongodb
+df -hT /mnt/data/mongodb
+```
+
+### Replica Set 최초 초기화
+
+세 멤버가 공유할 keyfile Secret을 한 번만 생성한다. keyfile은 MongoDB 멤버 간 인증에 쓰이며,
+Kafka Connect나 Query API가 사용하는 DB 계정과는 별도로 관리한다.
+
+```sh
+openssl rand -base64 512 | tr -d '\n' |
+  kctl -n dangubi-data create secret generic dangubi-mongodb-keyfile \
+    --from-file=keyfile=/dev/stdin
+```
+
+Argo CD에서 `dangubi-mongodb`를 수동 동기화한다. MongoDB PVC 3개가 각각 다른 PV에 바인딩되고
+세 Pod가 `Running`이 될 때까지 기다린다. 멤버가 Primary 또는 Secondary가 된 뒤에 Pod가
+`Ready`로 바뀐다.
+
+```sh
+kctl -n dangubi-data get pod,pvc -o wide
+kctl -n dangubi-data exec -it dangubi-mongodb-0 -c mongodb -- \
+  mongosh 'mongodb://127.0.0.1:27017/?directConnection=true'
+```
+
+데이터가 없는 새 클러스터에서만 아래 명령을 실행한다. `db.hello().primary`로 선출된 Primary를
+확인한다.
+
+```javascript
+rs.initiate({
+  _id: "dangubi-mongodb",
+  members: [
+    { _id: 0, host: "dangubi-mongodb-0.mongodb-headless.dangubi-data.svc.cluster.local:27017" },
+    { _id: 1, host: "dangubi-mongodb-1.mongodb-headless.dangubi-data.svc.cluster.local:27017" },
+    { _id: 2, host: "dangubi-mongodb-2.mongodb-headless.dangubi-data.svc.cluster.local:27017" }
+  ]
+});
+db.hello().primary;
+```
+
+Primary Pod에 위와 같은 방식으로 localhost에 접속한다. 계정이 없는 동안 허용되는
+localhost 예외를 이용해 첫 관리 계정을 생성하고, 인증 후 Kafka Connect 전용 계정을 만든다.
+
+```javascript
+const admin = db.getSiblingDB("admin");
+admin.createUser({
+  user: "ubi_mongo_admin",
+  pwd: passwordPrompt(),
+  roles: [
+    { role: "userAdminAnyDatabase", db: "admin" },
+    { role: "clusterMonitor", db: "admin" }
+  ]
+});
+admin.auth("ubi_mongo_admin", passwordPrompt());
+db.getSiblingDB("ubi_read").createUser({
+  user: "ubi_sink",
+  pwd: passwordPrompt(),
+  roles: [{ role: "readWrite", db: "ubi_read" }]
+});
+rs.status().members.map(({ name, stateStr }) => ({ name, stateStr }));
+```
+
+Primary 1개와 Secondary 2개가 확인되면 Kafka Connect 담당자가 Vault의 `ubi/kafka-connect/mongo`에
+`uri`를 설정한다. 위 멤버 주소 3개를 쉼표로 연결하고 `replicaSet=dangubi-mongodb&authSource=ubi_read`를
+지정한다. URI의 사용자 이름과 비밀번호에는 퍼센트 인코딩을 적용한다.
 
 ## 로컬 검증
 
@@ -197,6 +265,7 @@ helm lint .cache/openstack-cinder-csi --kube-version 1.36.5 \
 helm template cinder-csi .cache/openstack-cinder-csi \
   --namespace kube-system --kube-version 1.36.5 --values helm/cinder-csi/values.yaml
 kubectl kustomize manifests/infra/storage
+kubectl kustomize manifests/data/mongodb
 git diff --check
 ```
 

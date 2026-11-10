@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-headless
+spec:
+  clusterIP: None
+  # Replica Set 초기화 전에 각 멤버의 DNS 이름을 사용할 수 있게 한다.
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/instance: dangubi-mongodb
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: mongodb

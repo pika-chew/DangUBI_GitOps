@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-mongodb
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: dangubi-data
+  source:
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+    targetRevision: main
+    path: manifests/data/mongodb
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dangubi-data
+  # 로컬 디렉터리와 멤버 인증용 Secret을 준비한 뒤 수동 동기화한다.
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true

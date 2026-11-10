@@ -34,21 +34,21 @@ spec:
                 component: mysqld
     # 데이터 네임스페이스의 ResourceQuota는 초기화·보조 컨테이너에도 적용된다.
     initContainers:
-      - name: fixdatadir
+      - name: fixdatadir # 데이터 디렉토리 권한 맞추기
         resources:
           requests:
             cpu: 50m
             memory: 64Mi
           limits:
             memory: 128Mi
-      - name: initconf
+      - name: initconf # 설정 파일 준비
         resources:
           requests:
             cpu: 100m
             memory: 128Mi
           limits:
             memory: 256Mi
-      - name: initmysql
+      - name: initmysql # 새 MySQ l데이터 디렉토리 초기화
         resources:
           requests:
             cpu: 250m
