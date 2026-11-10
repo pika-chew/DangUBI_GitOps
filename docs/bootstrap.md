@@ -17,7 +17,7 @@ Argo CD 3.6의 공식 테스트 대상에는 Kubernetes 1.36이 포함된다.
 | AppProject | 배포 네임스페이스 | 담당 리소스 |
 | --- | --- | --- |
 | `dangubi-root` | `argocd` | 하위 Application만 |
-| `dangubi-infra` | `kube-system`, `metallb-system`, `argo-rollouts`, `dangubi-data`, `dangubi` | 플랫폼, Namespace, PV, StorageClass, CRD 등 |
+| `dangubi-infra` | `kube-system`, `metallb-system`, `argo-rollouts`, `external-secrets`, `dangubi-data`, `dangubi` | 플랫폼, Namespace, PV, StorageClass, CRD 등 |
 | `dangubi-data` | `dangubi-data` | MySQL, MongoDB, Kafka, Kafka Connect |
 | `dangubi-workloads` | `dangubi` | Command, Query |
 
@@ -30,7 +30,7 @@ Argo CD 설치 단계에서는 `argocd`만 생성한다. 업무·데이터 및 �
 AppProject 이름에 `dangubi-`를 붙여 다른 프로젝트와 구분한다.
 
 root·data·workloads 프로젝트는 이 GitOps 레포만 허용한다.
-infra 프로젝트는 Cinder CSI 설치를 위해 공식 OpenStack chart 저장소도 허용한다.
+infra 프로젝트는 Cinder CSI와 External Secrets Operator의 공식 chart 저장소도 허용한다.
 외부 Helm chart를 추가로 도입할 때 해당 프로젝트에 정확한 chart 저장소 URL을 추가한다.
 Operator를 도입하면 컨트롤러·CRD는 infra에서, 클러스터 정의는 data에서 관리한다.
 Calico와 OpenStack CCM은 기존 Ansible에서 계속 관리한다.
@@ -95,6 +95,7 @@ kubectl -n argocd describe application dangubi-root
 - `dangubi-data`: MySQL, MongoDB, Kafka, Kafka Connect
 - `metallb-system`: MetalLB
 - `argo-rollouts`: Argo Rollouts
+- `external-secrets`: External Secrets Operator
 
 기존 `kube-system`과 별도로 설치한 `argocd`는 이 Application에서 관리하지 않는다.
 여러 네임스페이스를 다루므로 Kustomize의 공통 `namespace` 변환은 사용하지 않는다.
@@ -162,12 +163,28 @@ LimitRange의 자동 기본값도 적용하지 않으므로 배포 파일에 자
 
 ```sh
 kubectl -n argocd get application dangubi-platform
-kubectl get namespace dangubi dangubi-data metallb-system argo-rollouts
+kubectl get namespace dangubi dangubi-data metallb-system argo-rollouts external-secrets
 kubectl -n dangubi-data describe resourcequota dangubi-data-compute
 kubectl -n dangubi describe resourcequota dangubi-workloads-compute
 ```
 
 다음 단계인 Cinder CSI와 공통 StorageClass의 구성·확인 절차는 [storage.md](storage.md)를 따른다.
+
+## External Secrets Operator
+
+`dangubi-external-secrets` Application은 공식 chart `2.14.0`으로 Operator, 검증 웹훅,
+인증서 컨트롤러와 CRD를 설치한다. 기존 Argo CD에는 병합 후 `kubectl apply -f bootstrap/infra-project.yaml`로
+chart 저장소와 대상 네임스페이스 허용을 반영한다. `dangubi-platform` 동기화로 `external-secrets`
+네임스페이스가 생겼는지 확인한 뒤 Operator의 준비 상태를 확인한다.
+
+```sh
+kubectl -n argocd get application dangubi-external-secrets
+kubectl -n external-secrets get deployments
+kubectl get crd externalsecrets.external-secrets.io clustersecretstores.external-secrets.io
+```
+
+Kafka Connect가 참조하는 `ClusterSecretStore/vault`와 실제 Vault 접속 설정은 별도로 구성한다.
+Secret 생성 여부는 Store가 준비된 뒤 `ExternalSecret`의 Ready 상태로 확인한다.
 
 ## 변경과 삭제
 
