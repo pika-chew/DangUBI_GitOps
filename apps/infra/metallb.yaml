@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-metallb
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: dangubi-infra
+  sources:
+    - repoURL: https://metallb.github.io/metallb
+      chart: metallb
+      targetRevision: 0.16.2
+      helm:
+        releaseName: metallb
+        valueFiles:
+          - $values/helm/metallb/values.yaml
+    - repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+      targetRevision: main
+      ref: values
+    # IP 풀과 L2 광고 설정. chart의 CRD·Webhook 이후 적용되도록 sync wave를 지정했다.
+    - repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+      targetRevision: main
+      path: manifests/infra/metallb
+  # Namespace와 Pod Security 라벨은 dangubi-platform이 관리한다.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: metallb-system
+  # controller가 인증서를 회전하며 caBundle을 직접 채우므로 Git과의 차이로 보지 않는다.
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: bgppeers.metallb.io
+      jsonPointers:
+        - /spec/conversion/webhook/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: metallb-webhook-configuration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+  syncPolicy:
+    automated:
+      # LoadBalancer VIP가 끊기지 않도록 Git에서 삭제된 리소스를 자동 삭제하지 않는다.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    # 최초 동기화에서 Webhook이 준비되기 전 IP 풀 생성이 거부되면 다시 시도한다.
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
