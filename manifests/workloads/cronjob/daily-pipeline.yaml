@@ -1,15 +1,46 @@
-# daily-pipeline (CronJob) — 매일 03:00, suspend false
-# - 역할: 배치 앱을 한 번 띄워 dailyPipelineJob을 실행한다. 개별 CronJob이며 다른 CronJob(ingest, score 등)을 부르지 않는다.
-# - 하루 작업(예: ingest → score → 요약)을 다 넣으려면 dailyPipelineJob 안에 Step으로 구성한다.
-#   그러면 순서와 "앞 단계 실패 시 중단"을 배치 앱이 보장하고, ingest·score CronJob은 단계별 재실행용이 된다.
-# - 채울 것:
-#   - schedule "0 3 * * *", timeZone Asia/Seoul, concurrencyPolicy Forbid(같은 날짜 중복 처리 방지), 재시도
-#   - 이미지: kustomization images의 배치 앱 이미지
-#   - args: --spring.batch.job.name=dailyPipelineJob (배치 앱이 이 형식으로 Job을 고른다)
-#   - Job 파라미터: 같은 파라미터로 두 번 실행하면 Spring Batch가 거부한다.
-#     매일 달라야 하므로 앱이 targetDate 기본값(어제)을 계산하거나 RunIdIncrementer를 쓴다
-#   - envFrom batch-config, batch-db-cred / resources(quota 필수)
+# 직접 실행: kubectl -n dangubi create job --from=cronjob/daily-pipeline daily-pipeline-manual-$(date +%s)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: daily-pipeline
+spec:
+  schedule: "0 3 * * *"
+  timeZone: Asia/Seoul
+  # 이전 실행이 아직 안 끝났으면 이번 실행은 건너뛴다. 같은 날짜 데이터를 두 번 처리하지 않게 한다.
+  concurrencyPolicy: Forbid
+  # 1h내로 재실행 가능
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # 실패 시 최대 2번 더 시도
+      backoffLimit: 2
+      # 2시간이 넘으면 강제 종료
+      activeDeadlineSeconds: 7200
+      # 끝난 Job과 파드를 하루 뒤 자동 삭제
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          # 실패한 파드를 그 자리에서 재시작하지 않고 남겨 둔다(로그 확인용).
+          restartPolicy: Never
+          containers:
+          - name: daily-pipeline
+            image: dangubi-batch
+            args:
+            - --spring.batch.job.name=dailyPipelineJob
+            envFrom:
+            - configMapRef:
+                name: batch-config
+            - secretRef:
+                name: batch-db-cred
+            env:
+            # JVM 힙을 메모리 limit의 75%로 맞춘다. 없으면 힙이 limit을 넘어 OOMKilled될 수 있다.
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=75
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                memory: 1Gi

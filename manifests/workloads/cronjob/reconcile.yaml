@@ -1,14 +1,42 @@
-# reconcile (CronJob) — 수동 실행 전용, suspend true
-# - 역할: 배치 앱으로 reconcileJob을 실행한다 (예: MySQL과 MongoDB 읽기 모델 비교·보정). 스케줄로는 돌지 않는다.
-# - 실행: kubectl -n dangubi create job --from=cronjob/reconcile reconcile-manual-$(date +%s)
-#         (suspend 상태여도 --from으로는 실행된다. Argo CD 화면의 CronJob "Create Job" 액션도 같다)
-# - 채울 것:
-#   - suspend: true
-#   - schedule: CronJob 필수 필드라 넣어야 한다. 오지 않는 날짜(예: "0 0 31 2 *", 2월 31일)로 두면
-#     실수로 suspend를 풀어도 실행되지 않는다
-#   - args --spring.batch.job.name=reconcileJob, Job 파라미터
-#   - 이미지, envFrom(MongoDB도 쓰면 그 접속 정보), resources(quota 필수)
+# 테스트용 Job 틀: 정합성 검토(reconcileJob)만 따로 실행한다. 스케줄로는 돌지 않는다.
+# 직접 실행: kubectl -n dangubi create job --from=cronjob/reconcile reconcile-manual-$(date +%s)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: reconcile
+spec:
+  # 스케줄로 실행하지 않는다.
+  # (1) suspend (2) 2/31 실행
+  suspend: true
+  schedule: "0 0 31 2 *"
+  timeZone: Asia/Seoul
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      # 2시간이 넘으면 강제 종료
+      activeDeadlineSeconds: 7200
+      # 끝난 Job과 파드를 하루 뒤 자동 삭제
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: reconcile
+            image: dangubi-batch
+            args:
+            - --spring.batch.job.name=reconcileJob
+            envFrom:
+            - configMapRef:
+                name: batch-config
+            - secretRef:
+                name: batch-db-cred
+            env:
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=75
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                memory: 1Gi
