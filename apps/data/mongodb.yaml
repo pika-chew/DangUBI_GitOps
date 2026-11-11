@@ -14,7 +14,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: dangubi-data
-  # 로컬 디렉터리와 멤버 인증용 Secret을 준비한 뒤 수동 동기화한다.
+  # Operator와 로컬 PV가 준비된 뒤 수동 동기화한다.
   syncPolicy:
     syncOptions:
       - ServerSideApply=true

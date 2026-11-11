@@ -26,7 +26,7 @@ AppProject와 부모 Application은 Ansible로 설치한 Argo CD의 `argocd` 네
 AppProject 이름에 `dangubi-`를 붙여 다른 프로젝트와 구분한다.
 
 root·data·workloads 프로젝트는 이 GitOps 레포만 허용한다.
-infra 프로젝트는 Cinder CSI, External Secrets Operator, MySQL Operator의 공식 chart 저장소도 허용한다.
+infra 프로젝트는 Cinder CSI, External Secrets Operator, MySQL Operator, Percona Operator의 공식 chart 저장소도 허용한다.
 외부 Helm chart를 추가로 도입할 때 해당 프로젝트에 정확한 chart 저장소 URL을 추가한다.
 Operator를 도입하면 컨트롤러·CRD는 infra에서, 클러스터 정의는 data에서 관리한다.
 Calico와 OpenStack CCM은 기존 Ansible에서 계속 관리한다.
@@ -178,6 +178,18 @@ Operator는 `mysql-operator` 네임스페이스에 한 개를 실행하고 `dang
 ```sh
 kubectl -n mysql-operator rollout status deployment/mysql-operator --timeout=300s
 kubectl wait --for=condition=Established crd/innodbclusters.mysql.oracle.com --timeout=120s
+```
+
+## MongoDB Operator
+
+`dangubi-mongodb-operator`는 Percona의 `psmdb-operator-crds`와 `psmdb-operator` chart
+`1.23.1`을 사용한다. 컨트롤러는 `dangubi-data`에 설치하고 해당 네임스페이스만 감시한다.
+기존 Argo CD에는 갱신된 `bootstrap/infra-project.yaml`을 적용해 chart 저장소를 허용한다.
+MongoDB Application을 동기화하기 전에 컨트롤러와 CRD가 준비됐는지 확인한다.
+
+```sh
+kubectl -n dangubi-data rollout status deployment/dangubi-mongodb-operator-psmdb-operator --timeout=300s
+kubectl wait --for=condition=Established crd/perconaservermongodbs.psmdb.percona.com --timeout=120s
 ```
 
 ## 변경과 삭제
