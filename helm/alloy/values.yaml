@@ -36,6 +36,11 @@ alloy:
           // Calico 가상 인터페이스는 Pod마다 생겨서 제외한다.
           device_exclude = "^(cali.*|vxlan\\.calico|tunl.*|veth.*|lo)$"
         }
+
+        netclass {
+          // node_network_up 등 인터페이스 정보 지표에서도 같은 인터페이스를 제외한다.
+          ignored_devices = "^(cali.*|vxlan\\.calico|tunl.*|veth.*|lo)$"
+        }
       }
 
       discovery.relabel "node" {
@@ -127,10 +132,11 @@ alloy:
           action        = "drop"
         }
 
-        // container 라벨이 빈 값인 지표(시스템 cgroup, Pod 합계). Pod 합계는 sum by (pod)로 계산한다.
+        // container 라벨이 빈 container_* 지표(시스템 cgroup, Pod 합계). Pod 합계는 sum by (pod)로 계산한다.
+        // container_ 지표에만 적용해 up·scrape_*(수집 상태)와 machine_*(노드 사양)은 남긴다.
         rule {
-          source_labels = ["container"]
-          regex         = ""
+          source_labels = ["__name__", "container"]
+          regex         = "container_.+;"
           action        = "drop"
         }
       }
