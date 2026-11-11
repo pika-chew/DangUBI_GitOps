@@ -26,10 +26,13 @@ resources:
   - batch-config.yaml           # 공용 설정
   - batch-externalsecret.yaml   # 공용 DB 계정
   # 스케줄 작업 (시간순)
-  - db-backup.yaml              # 매일 02:00, 배치 앱 아님
+  # db-backup·monthly-finalize·cleanup은 아직 spec이 없는 틀이라 동기화에서 뺀다.
+  # spec(schedule·jobTemplate)이 없는 CronJob은 API 서버 검증에서 거부되고, 그러면 이 앱 전체 sync가 실패한다.
+  # 매니페스트를 채우면 주석을 푼다.
+  # - db-backup.yaml            # 매일 02:00, 배치 앱 아님
   - daily-pipeline.yaml         # 매일 03:00
-  - monthly-finalize.yaml       # 매월 1일 05:00
-  - cleanup.yaml                # 매일 06:00
+  # - monthly-finalize.yaml     # 매월 1일 05:00
+  # - cleanup.yaml              # 매일 06:00
   # 테스트용 Job 틀 (suspend: true, daily-pipeline 묶음의 각 단계)
   - reconcile.yaml
   - ingest.yaml
