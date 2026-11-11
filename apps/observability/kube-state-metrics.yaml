@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-kube-state-metrics
+  namespace: argocd
+spec:
+  project: dangubi-observability
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-state-metrics
+      targetRevision: 8.8.0
+      helm:
+        releaseName: kube-state-metrics
+        # 프로그램은 공식 Helm Chart를 사용하고, values.yaml은 DangUBI_GitOps에서 관리한다.
+        valueFiles:
+          - $values/helm/kube-state-metrics/values.yaml
+    - repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+      targetRevision: main
+      ref: values
+  # Namespace와 Pod Security 라벨은 dangubi-platform이 관리한다.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  # ArgoCD 자동 동기화 정책을 설정한다.
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
