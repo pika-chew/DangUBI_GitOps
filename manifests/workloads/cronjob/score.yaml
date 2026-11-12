@@ -1,0 +1,38 @@
+# 테스트용 Job 틀: 점수 계산(scoreJob)만 따로 실행한다. 스케줄로는 돌지 않는다.
+# 직접 실행: kubectl -n dangubi create job --from=cronjob/score score-manual-$(date +%s)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: score
+spec:
+  suspend: true
+  schedule: "0 0 31 2 *"
+  timeZone: Asia/Seoul
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 7200
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: score
+            image: dangubi-batch
+            args:
+            - --spring.batch.job.name=scoreJob
+            envFrom:
+            - configMapRef:
+                name: batch-config
+            - secretRef:
+                name: batch-db-cred
+            env:
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=75
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                memory: 1Gi

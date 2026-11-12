@@ -1,0 +1,13 @@
+# dangubi-query-api (Argo CD Application)
+# - 역할: manifests/workloads/query/를 동기화한다. MongoDB 읽기 모델을 조회하는 API (Argo Rollouts blue-green).
+# - 채울 것:
+#   - sync-wave: 3 (MongoDB 0 → Mongo Sink 2 다음)
+#   - project: dangubi-workloads / destination namespace: dangubi
+#   - source: GitOps 저장소, targetRevision main, path manifests/workloads/query
+#   - syncPolicy: automated(prune, selfHeal)
+#   - Argo Rollouts 컨트롤러(Rollout CRD)가 먼저 설치돼 있어야 한다. 없으면 SkipDryRunOnMissingResource + retry 고려
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-query-api
+  namespace: argocd

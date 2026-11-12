@@ -1,0 +1,11 @@
+# monthly-finalize (CronJob) — 매월 1일 05:00, suspend false
+# - 역할: 배치 앱으로 monthlyFinalizeJob을 실행한다 (예: 지난달 보험료 확정).
+# - 채울 것:
+#   - schedule "0 5 1 * *", timeZone Asia/Seoul, concurrencyPolicy, 재시도
+#   - startingDeadlineSeconds: 한 달에 한 번이라 놓치면 영향이 크다. 장애로 못 돌았을 때 늦게라도 실행할지
+#   - args --spring.batch.job.name=monthlyFinalizeJob, Job 파라미터(대상 월)
+#   - 이미지, envFrom batch-config·batch-db-cred, resources(quota 필수)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: monthly-finalize

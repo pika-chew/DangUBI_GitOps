@@ -1,0 +1,14 @@
+# L2 광고만 사용하므로 BGP용 FRR 백엔드를 모두 끈다(native 모드).
+# 0.16부터 chart 기본값이 frr-k8s 모드로 바뀌었다.
+frrk8s:
+  enabled: false
+
+speaker:
+  frr:
+    enabled: false
+  # 기본값 false 유지: kubeadm이 CP에 붙인 exclude-from-external-load-balancers 라벨을 따른다.
+  ignoreExcludeLB: false
+
+# CRD는 chart가 설치하고 업그레이드한다.
+crds:
+  enabled: true

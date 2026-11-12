@@ -1,0 +1,7 @@
+# collector (Service)
+# - 역할: Collector API 접속 주소.
+# - 채울 것: type(클러스터 내부만이면 ClusterIP, MetalLB 외부 IP가 필요하면 LoadBalancer), selector, ports
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector

@@ -1,0 +1,7 @@
+apiVersion: v1
+data:
+  SPRING_PROFILES_ACTIVE: prod
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-router.dangubi-data.svc.cluster.local:3306/ubi
+kind: ConfigMap
+metadata:
+  name: batch-config

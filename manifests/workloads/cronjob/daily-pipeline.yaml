@@ -1,0 +1,46 @@
+# 직접 실행: kubectl -n dangubi create job --from=cronjob/daily-pipeline daily-pipeline-manual-$(date +%s)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-pipeline
+spec:
+  schedule: "0 3 * * *"
+  timeZone: Asia/Seoul
+  # 이전 실행이 아직 안 끝났으면 이번 실행은 건너뛴다. 같은 날짜 데이터를 두 번 처리하지 않게 한다.
+  concurrencyPolicy: Forbid
+  # 1h내로 재실행 가능
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # 실패 시 최대 2번 더 시도
+      backoffLimit: 2
+      # 2시간이 넘으면 강제 종료
+      activeDeadlineSeconds: 7200
+      # 끝난 Job과 파드를 하루 뒤 자동 삭제
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          # 실패한 파드를 그 자리에서 재시작하지 않고 남겨 둔다(로그 확인용).
+          restartPolicy: Never
+          containers:
+          - name: daily-pipeline
+            image: dangubi-batch
+            args:
+            - --spring.batch.job.name=dailyPipelineJob
+            envFrom:
+            - configMapRef:
+                name: batch-config
+            - secretRef:
+                name: batch-db-cred
+            env:
+            # JVM 힙을 메모리 limit의 75%로 맞춘다. 없으면 힙이 limit을 넘어 OOMKilled될 수 있다.
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=75
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                memory: 1Gi
