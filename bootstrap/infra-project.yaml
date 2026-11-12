@@ -11,6 +11,7 @@ spec:
     - https://kubernetes.github.io/cloud-provider-openstack
     - https://metallb.github.io/metallb
     - https://charts.external-secrets.io
+    - https://argoproj.github.io/argo-helm
   destinations:
     - server: https://kubernetes.default.svc
       namespace: kube-system
