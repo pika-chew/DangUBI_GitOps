@@ -1,0 +1,24 @@
+# 컨트롤러와 함께 Rollout API를 등록하고 삭제 시 CRD를 보존한다.
+installCRDs: true
+keepCRDs: true
+
+# argo-rollouts 네임스페이스에서 실행하며 dangubi의 Rollout을 관리한다.
+clusterInstall: true
+# 기본 view/edit/admin 역할에 Rollout 권한을 추가하지 않는다.
+createClusterAggregateRoles: false
+
+controller:
+  replicas: 2
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+dashboard:
+  enabled: false
