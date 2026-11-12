@@ -5,6 +5,8 @@
 #   - 노드 자원: 내장 unix exporter(node_exporter), 호스트 /proc·/sys·/ 를 마운트해 읽는다
 #   - kubelet, cAdvisor: 각 Alloy가 자기 노드의 kubelet(10250)만 scrape
 #   - kube-state-metrics: 클러스터에 1개이므로 클러스터링으로 Alloy 중 하나만 scrape
+#   - 컨트롤 플레인(API 서버·etcd·scheduler·controller-manager): 컨트롤 플레인 노드의 Alloy가 자기 노드만 scrape
+#   - CoreDNS: 각 Alloy가 자기 노드에 뜬 CoreDNS Pod만 scrape
 #   - Alloy 자기 감시
 
 # PodLogs 등 Alloy CRD는 쓰지 않는다. AppProject도 CRD 생성을 허용하지 않는다.
@@ -182,6 +184,159 @@ alloy:
         }
       }
 
+      // ---------- 컨트롤 플레인 (API 서버·etcd·scheduler·controller-manager) ----------
+      // 자기 노드가 컨트롤 플레인일 때만 대상이 1개 생긴다. 워커의 Alloy는 대상이 비어 수집하지 않는다.
+      discovery.kubernetes "control_plane" {
+        role = "node"
+
+        selectors {
+          role  = "node"
+          field = "metadata.name=" + sys.env("NODE_NAME")
+          label = "node-role.kubernetes.io/control-plane"
+        }
+      }
+
+      discovery.relabel "control_plane" {
+        targets = discovery.kubernetes.control_plane.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_node_name"]
+          target_label  = "instance"
+        }
+      }
+
+      // API 서버는 모든 인터페이스(*:6443)에서 받는다. 노드 주소(IP:10250)의 포트만 바꾼다.
+      discovery.relabel "apiserver" {
+        targets = discovery.relabel.control_plane.output
+
+        rule {
+          source_labels = ["__address__"]
+          regex         = "([^:]+):.*"
+          replacement   = "$1:6443"
+          target_label  = "__address__"
+        }
+      }
+
+      // scheduler·controller-manager·etcd는 127.0.0.1에만 열려 있다(kubeadm 기본값).
+      // Alloy가 hostNetwork라서 자기 노드의 localhost로 접근한다.
+      discovery.relabel "scheduler" {
+        targets = discovery.relabel.control_plane.output
+
+        rule {
+          target_label = "__address__"
+          replacement  = "127.0.0.1:10259"
+        }
+      }
+
+      discovery.relabel "controller_manager" {
+        targets = discovery.relabel.control_plane.output
+
+        rule {
+          target_label = "__address__"
+          replacement  = "127.0.0.1:10257"
+        }
+      }
+
+      discovery.relabel "etcd" {
+        targets = discovery.relabel.control_plane.output
+
+        rule {
+          target_label = "__address__"
+          replacement  = "127.0.0.1:2381"
+        }
+      }
+
+      // API 서버·scheduler·controller-manager는 HTTPS + 토큰. 인증서는 자체 서명이다.
+      prometheus.scrape "apiserver" {
+        targets           = discovery.relabel.apiserver.output
+        job_name          = "apiserver"
+        scrape_interval   = "30s"
+        scheme            = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        forward_to        = [prometheus.remote_write.default.receiver]
+
+        tls_config {
+          insecure_skip_verify = true
+        }
+      }
+
+      prometheus.scrape "scheduler" {
+        targets           = discovery.relabel.scheduler.output
+        job_name          = "kube-scheduler"
+        scrape_interval   = "30s"
+        scheme            = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        forward_to        = [prometheus.remote_write.default.receiver]
+
+        tls_config {
+          insecure_skip_verify = true
+        }
+      }
+
+      prometheus.scrape "controller_manager" {
+        targets           = discovery.relabel.controller_manager.output
+        job_name          = "kube-controller-manager"
+        scrape_interval   = "30s"
+        scheme            = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        forward_to        = [prometheus.remote_write.default.receiver]
+
+        tls_config {
+          insecure_skip_verify = true
+        }
+      }
+
+      // etcd 메트릭 포트는 HTTP, 인증 없음(--listen-metrics-urls=http://127.0.0.1:2381)
+      prometheus.scrape "etcd" {
+        targets         = discovery.relabel.etcd.output
+        job_name        = "etcd"
+        scrape_interval = "30s"
+        forward_to      = [prometheus.remote_write.default.receiver]
+      }
+
+      // ---------- CoreDNS (자기 노드의 Pod만) ----------
+      discovery.kubernetes "coredns" {
+        role = "pod"
+
+        namespaces {
+          names = ["kube-system"]
+        }
+
+        selectors {
+          role  = "pod"
+          label = "k8s-app=kube-dns"
+          field = "spec.nodeName=" + sys.env("NODE_NAME")
+        }
+      }
+
+      discovery.relabel "coredns" {
+        targets = discovery.kubernetes.coredns.targets
+
+        // Pod 포트 중 메트릭 포트(metrics, 9153)만 남긴다.
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_port_name"]
+          regex         = "metrics"
+          action        = "keep"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "instance"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_node_name"]
+          target_label  = "node"
+        }
+      }
+
+      prometheus.scrape "coredns" {
+        targets         = discovery.relabel.coredns.output
+        job_name        = "coredns"
+        scrape_interval = "30s"
+        forward_to      = [prometheus.remote_write.default.receiver]
+      }
+
       // ---------- Alloy 자기 감시 ----------
       prometheus.exporter.self "alloy" { }
 
@@ -270,6 +425,9 @@ rbac:
     # kubelet /metrics, /metrics/cadvisor 접근
     - apiGroups: [""]
       resources: ["nodes/metrics"]
+      verbs: ["get"]
+    # API 서버·scheduler·controller-manager의 /metrics 접근
+    - nonResourceURLs: ["/metrics"]
       verbs: ["get"]
 
 controller:
