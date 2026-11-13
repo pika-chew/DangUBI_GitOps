@@ -1,14 +1,82 @@
-# collector (Deployment)
-# - 역할: 차량 주행 데이터를 받아 MySQL에 저장하는 수집 API 파드.
-# - 정할 것: 점수 계산과 outbox 기록을 이 앱이 하는지, 배치(daily-pipeline 등)가 하는지
-# - 채울 것:
-#   - replicas, 라벨·셀렉터
-#   - 이미지(GHCR 경로·태그), 포트
-#   - 설정: envFrom collector-config / 계정: collector-mysql-cred Secret
-#   - resources: requests(cpu, memory) + limits(memory) 필수 — dangubi ResourceQuota 때문에 없으면 파드가 생성되지 않는다
-#   - readiness/liveness probe (Spring Actuator)
-#   - 노드 분산 (topologySpreadConstraints, kubernetes.io/hostname)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  labels:
+    app: collector
   name: collector
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: collector
+  template:
+    metadata:
+      labels:
+        app: collector
+    spec:
+      # 파드 2개를 서로 다른 노드에 나눠 띄운다. 노드 하나가 죽어도 1개는 남는다.
+      # ScheduleAnyway: 나눌 노드가 부족하면 같은 노드에라도 띄운다(배포가 멈추지 않게).
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: collector
+      # 파드 교체 시 진행 중인 요청을 마무리할 시간(초). 
+      # 앱에 server.shutdown=graceful 설정이 있어야 효과가 있다.
+      terminationGracePeriodSeconds: 30
+      containers:
+      - image: dangubi-be-collector
+        name: dangubi-be-collector
+        ports:
+        # 포트에 이름을 붙여 probe와 Service(targetPort: http)가 번호 대신 이름으로 가리키게 한다.
+        - name: http
+          containerPort: 8080
+        # 비밀이 아닌 설정(프로필, DB 주소)은 ConfigMap에서 통째로 환경 변수로 받는다.
+        envFrom:
+        - configMapRef:
+            name: collector-config
+        env:
+        # DB 계정은 ExternalSecret이 만든 Secret에서 받는다. key는 externalsecret.yaml의 secretKey와 같아야 한다.
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: collector-mysql-cred
+              key: username
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: collector-mysql-cred
+              key: password
+        # JVM 힙을 메모리 limit의 75%로 맞춘다. 없으면 힙이 limit을 넘어 OOMKilled될 수 있다.
+        - name: JAVA_TOOL_OPTIONS
+          value: -XX:MaxRAMPercentage=75
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            memory: 1Gi
+        # Spring Boot Actuator 기준 경로.
+        # startupProbe: 시작이 느린 Spring이 다 뜰 때까지(최대 5초 x 30 = 150초) 아래 두 probe를 미룬다.
+        startupProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: http
+          periodSeconds: 5
+          failureThreshold: 30
+        # readinessProbe: 실패하면 Service가 이 파드로 트래픽을 보내지 않는다(재시작은 안 함).
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: http
+          periodSeconds: 10
+          failureThreshold: 3
+        # livenessProbe: 실패하면 컨테이너를 재시작한다(앱이 멈춘 경우).
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: http
+          periodSeconds: 10
+          failureThreshold: 3

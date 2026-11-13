@@ -1,13 +1,37 @@
 # dangubi-query-api (Argo CD Application)
-# - 역할: manifests/workloads/query/를 동기화한다. MongoDB 읽기 모델을 조회하는 API (Argo Rollouts blue-green).
-# - 채울 것:
-#   - sync-wave: 3 (MongoDB 0 → Mongo Sink 2 다음)
-#   - project: dangubi-workloads / destination namespace: dangubi
-#   - source: GitOps 저장소, targetRevision main, path manifests/workloads/query
-#   - syncPolicy: automated(prune, selfHeal)
-#   - Argo Rollouts 컨트롤러(Rollout CRD)가 먼저 설치돼 있어야 한다. 없으면 SkipDryRunOnMissingResource + retry 고려
+# manifests/workloads/query/를 동기화한다. MongoDB 읽기 모델을 조회하는 API (Argo Rollouts blue-green).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: dangubi-query-api
   namespace: argocd
+  annotations:
+    # MongoDB(wave 0) → Mongo Sink(wave 2) 다음에 올라온다.
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: dangubi-workloads
+  source:
+    repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+    targetRevision: main
+    path: manifests/workloads/query
+    
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dangubi
+
+  syncPolicy:
+    automated:
+      # Query는 상태가 없다. 데이터는 MongoDB에 있으므로 깃에서 빠진 리소스는 지워도 된다.
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Rollout·ExternalSecret CRD는 Argo Rollouts·External Secrets(infra)가 설치될 때 등록된다.
+      # 그 전에는 배포 전 검사(dry-run)만 건너뛴다.
+      - SkipDryRunOnMissingResource=true
+    retry:
+      # kafka-connect.yaml과 같다. CRD·Secret 준비 지연을 재시도로 흡수한다.
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

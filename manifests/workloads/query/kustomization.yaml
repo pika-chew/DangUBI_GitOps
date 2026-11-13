@@ -1,13 +1,10 @@
-# Query 매니페스트 묶음. apps/workloads/query-api.yaml이 이 경로를 동기화한다.
-# Deployment 대신 Argo Rollouts의 Rollout(blue-green)을 쓴다.
-# - 채울 것: 자동 검증을 쓰면 AnalysisTemplate 추가, 외부 노출이 필요하면 Ingress 등 추가
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 namespace: dangubi
 
 resources:
-  - externalsecret.yaml   # MongoDB 읽기 전용 계정 (Vault → Secret)
+  - externalsecret.yaml   # MongoDB 읽기 전용 접속 URI (Vault → Secret)
   - configmap.yaml        # 비밀이 아닌 설정
   - services.yaml         # active / preview Service 2개
   - rollout.yaml          # blue-green 배포 단위

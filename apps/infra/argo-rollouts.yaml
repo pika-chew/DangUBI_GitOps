@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-argo-rollouts
+  namespace: argocd
+  annotations:
+    # 플랫폼 다음에 컨트롤러 Application을 등록한다.
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  project: dangubi-infra
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-rollouts
+      targetRevision: 2.43.11 # 차트 버전 (Argo Rollouts 컨트롤러는 v1.10.2)
+      helm:
+        releaseName: argo-rollouts
+        valueFiles:
+          - $values/helm/argo-rollouts/values.yaml
+    - repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      # Rollout CRD가 클라이언트 측 annotation 크기 제한을 넘지 않도록 적용한다.
+      - ServerSideApply=true
