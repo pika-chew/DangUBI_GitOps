@@ -26,7 +26,7 @@ AppProject와 부모 Application은 Ansible로 설치한 Argo CD의 `argocd` 네
 AppProject 이름에 `dangubi-`를 붙여 다른 프로젝트와 구분한다.
 
 root·data·workloads 프로젝트는 이 GitOps 레포만 허용한다.
-infra 프로젝트는 Cinder CSI와 External Secrets Operator의 공식 chart 저장소도 허용한다.
+infra 프로젝트는 Cinder CSI, External Secrets Operator, Argo Rollouts의 Helm 차트 저장소도 허용한다.
 외부 Helm chart를 추가로 도입할 때 해당 프로젝트에 정확한 chart 저장소 URL을 추가한다.
 Operator를 도입하면 컨트롤러·CRD는 infra에서, 클러스터 정의는 data에서 관리한다.
 Calico와 OpenStack CCM은 기존 Ansible에서 계속 관리한다.
@@ -165,6 +165,28 @@ kubectl get crd externalsecrets.external-secrets.io clustersecretstores.external
 
 Kafka Connect가 참조하는 `ClusterSecretStore/vault`와 실제 Vault 접속 설정은 별도로 구성한다.
 Secret 생성 여부는 Store가 준비된 뒤 `ExternalSecret`의 Ready 상태로 확인한다.
+
+## Argo Rollouts
+
+`dangubi-argo-rollouts` Application은 Helm 차트 `2.43.11`로 클러스터에 CRD를 등록하고
+컨트롤러 `v1.10.2`를 `argo-rollouts` 네임스페이스에 배포한다. `dangubi-platform`이
+네임스페이스를 만들고, 컨트롤러는 `dangubi`의 Query API Rollout을 포함해 클러스터 범위의
+Rollout을 관리한다.
+
+기존 Argo CD에는 `main` 병합 후 아래 명령으로 갱신된 차트 저장소 허용 설정을 반영한다.
+
+```sh
+kubectl apply -f bootstrap/infra-project.yaml
+```
+
+Query API Rollout을 배포하기 전에 Application이 `Synced`와 `Healthy`인지 확인하고,
+컨트롤러 Deployment와 `Rollout` CRD가 준비될 때까지 기다린다.
+
+```sh
+kubectl -n argocd get application dangubi-argo-rollouts
+kubectl -n argo-rollouts rollout status deployment/argo-rollouts --timeout=300s
+kubectl wait --for=condition=Established crd/rollouts.argoproj.io --timeout=120s
+```
 
 ## 변경과 삭제
 
