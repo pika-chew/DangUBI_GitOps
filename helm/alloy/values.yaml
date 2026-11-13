@@ -8,6 +8,7 @@
 #   - 컨트롤 플레인(API 서버·etcd·scheduler·controller-manager): 컨트롤 플레인 노드의 Alloy가 자기 노드만 scrape
 #   - CoreDNS: 각 Alloy가 자기 노드에 뜬 CoreDNS Pod만 scrape
 #   - Alloy 자기 감시
+#   - Pod 로그: 자기 노드의 /var/log/pods 파일을 읽어 모니터링 VM의 Loki로 push
 
 # PodLogs 등 Alloy CRD는 쓰지 않는다. AppProject도 CRD 생성을 허용하지 않는다.
 crds:
@@ -374,6 +375,104 @@ alloy:
         }
       }
 
+      // ========== Pod 로그 → Loki ==========
+      // 흐름: Pod 찾기 → 라벨·파일 경로 만들기 → 파일 읽기 → 형식 정리 → 전송
+      // K8s는 컨테이너 로그를 노드의 /var/log/pods/<namespace>_<pod>_<uid>/<container>/<재시작 번호>.log에 쓴다.
+
+      // 자기 노드에 뜬 Pod만 찾는다.
+      discovery.kubernetes "pods" {
+        role = "pod"
+
+        selectors {
+          role  = "pod"
+          field = "spec.nodeName=" + sys.env("NODE_NAME")
+        }
+      }
+
+      // 로그에 라벨을 붙이는 단계
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.pods.targets
+
+        // Loki 라벨은 검색 기준으로 쓸 값만 둔다. 고유값(vehicleId·trace_id 등)은 라벨로 넣지 않는다.
+        // 아래 항목들이 라벨이 되어 Loki 한 줄의 로그가 된다.
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "container"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+          target_label  = "app"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_node_name"]
+          target_label  = "node"
+        }
+        
+        // Pod UID와 컨테이너 이름으로 로그 파일 경로를 만든다.
+        rule {
+          source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+          separator     = "/"
+          replacement   = "/var/log/pods/*$1/*.log"
+          target_label  = "__path__"
+        }
+
+        // 포트가 여러 개인 컨테이너는 포트 수만큼 대상이 생긴다.
+        // 포트 정보 등 __meta_ 라벨을 지워 같은 파일을 가리키는 대상을 하나로 합친다.
+        rule {
+          regex  = "__meta_.+"
+          action = "labeldrop"
+        }
+      }
+
+      // 경로 패턴(*)을 실제 파일 목록으로 바꾼다. 재시작으로 새 파일이 생기면 따라간다.
+      local.file_match "pod_logs" {
+        path_targets = discovery.relabel.pod_logs.output
+      }
+
+      // 파일을 읽은 위치는 storagePath(호스트 디렉터리)에 저장해 Alloy가 재시작해도 이어서 읽는다.
+      loki.source.file "pod_logs" {
+        targets    = local.file_match.pod_logs.targets
+        forward_to = [loki.process.pod_logs.receiver]
+      }
+
+      loki.process "pod_logs" {
+        forward_to = [loki.write.default.receiver]
+
+        // containerd가 붙인 앞부분(시간 stdout F)을 떼고, 그 시간을 로그 시간으로 쓴다.
+        stage.cri { }
+
+        // 파일 경로 라벨은 재시작마다 값이 바뀌어 스트림만 늘리므로 지운다.
+        stage.label_drop {
+          values = ["filename"]
+        }
+
+        // 마스킹(vehicleId·좌표 등)과 trace_id 추출은 앱 로그 형식이 정해지면 여기에 추가한다.
+      }
+
+      loki.write "default" {
+        endpoint {
+          // 모니터링 VM 사설 IP. 보안 그룹에서 172.16.10.0/24 → 3100 허용
+          url = "http://172.16.20.20:3100/loki/api/v1/push"
+        }
+
+        external_labels = {
+          env     = "private",
+          cluster = "k8s",
+        }
+      }
+
 # chart 설정, Alloy DaemonSet을 어떻게 배치할지 정의한다.
 
   # kube-state-metrics 대상을 Alloy끼리 나눠 갖는다.
@@ -383,6 +482,10 @@ alloy:
   # Grafana로 사용 통계를 보내지 않는다.
   enableReporting: false
 
+  # Alloy 상태 저장 위치(로그 파일을 어디까지 읽었는지 등).
+  # 기본값(/tmp/alloy)은 Pod가 재시작하면 사라져 로그를 처음부터 다시 보내므로 호스트 디렉터리를 쓴다.
+  storagePath: /var/lib/alloy/data
+
   # 설정에서 sys.env("NODE_NAME")으로 자기 노드를 구분한다.
   extraEnv:
     - name: NODE_NAME
@@ -390,8 +493,10 @@ alloy:
         fieldRef:
           fieldPath: spec.nodeName
 
-  # 노드 메트릭용 호스트 경로. 읽기 전용
   mounts:
+    # 호스트 /var/log를 읽기 전용으로 마운트한다(/var/log/pods의 컨테이너 로그).
+    varlog: true
+    # 노드 메트릭용 호스트 경로. 읽기 전용
     extra:
       - name: proc
         mountPath: /host/proc
@@ -403,6 +508,9 @@ alloy:
         mountPath: /host/root
         readOnly: true
         mountPropagation: HostToContainer
+      # storagePath. 읽은 위치를 노드에 남겨 Alloy가 재시작해도 이어서 읽는다.
+      - name: alloy-data
+        mountPath: /var/lib/alloy/data
 
   resources:
     requests:
@@ -455,6 +563,10 @@ controller:
       - name: root
         hostPath:
           path: /
+      - name: alloy-data
+        hostPath:
+          path: /var/lib/alloy/data
+          type: DirectoryOrCreate
 
 # ---------- 이후 단계(4단계)에서 추가할 것 ----------
 # 1. 앱 트레이스·메트릭 수신(OTLP) → Tempo
@@ -462,9 +574,5 @@ controller:
 #            → 트레이스는 otelcol.exporter.otlp(Tempo), 앱 메트릭은 otelcol.exporter.prometheus → remote_write
 #    - chart: alloy.extraPorts에 4317·4318 추가. 앱은 Service(alloy.monitoring)나 노드 IP로 전송
 #    - vehicleId·좌표 등 민감 속성은 otelcol.processor.attributes로 해시·제거
-# 2. Pod 로그 수집 → Loki
-#    - 설정: discovery.kubernetes(pod, 자기 노드만) → loki.source.kubernetes 또는 local.file_match + loki.source.file
-#            → loki.process(마스킹, trace_id 추출) → loki.write(모니터링 VM Loki)
-#    - chart: 파일 방식이면 alloy.mounts.varlog: true. RBAC에 pods/log 추가(API 방식)
-#    - Loki 라벨에 vehicleId·userId·trace_id 같은 고유값을 넣지 않는다
-#    - 보안 그룹에 172.16.10.0/24 → Loki 포트(3100) 허용
+# 2. Pod 로그 마스킹·trace_id 추출
+#    - loki.process "pod_logs"에 stage 추가(앱 로그 형식이 정해지면)
