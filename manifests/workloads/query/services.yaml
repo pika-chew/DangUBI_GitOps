@@ -9,8 +9,10 @@ metadata:
     app.kubernetes.io/name: query-api
     app.kubernetes.io/part-of: dangubi
   annotations:
-    # MetalLB query-api-vip 풀(manifests/infra/metallb/query-api-vip.yaml)의 VIP. 풀이 autoAssign: false라 IP를 직접 지정한다.
-    metallb.io/loadBalancerIPs: 172.16.10.202
+    # IP는 직접 적지 않고 MetalLB query-api-vip 풀(manifests/infra/metallb/query-api-vip.yaml)에서 받는다.
+    # 풀이 autoAssign: false라 이름으로 지정해야 하고, 풀에 IP가 1개(/32)뿐이라 항상 같은 VIP가 된다.
+    # IP를 바꿀 때는 풀만 고치면 된다.
+    metallb.io/address-pool: query-api-vip
 spec:
   type: LoadBalancer
   # MetalLB L2는 VIP로 직접 받으므로 NodePort가 필요 없다. 모든 노드에 우회 경로가 열리지 않게 한다.
