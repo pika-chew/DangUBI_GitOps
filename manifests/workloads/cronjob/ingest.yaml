@@ -1,9 +1,42 @@
-# ingest (CronJob) — 수동 실행 전용, suspend true
-# - 역할: 배치 앱으로 ingestJob을 실행한다. daily-pipeline의 한 단계만 따로 다시 돌릴 때 쓰는 용도로 보인다.
-# - 실행: kubectl -n dangubi create job --from=cronjob/ingest ingest-manual-$(date +%s)
-# - 채울 것: suspend true, 오지 않는 날짜 schedule(reconcile.yaml 참고),
-#           args --spring.batch.job.name=ingestJob, Job 파라미터, 이미지, envFrom, resources(quota 필수)
+# 테스트용 Job 틀: 데이터 적재(ingestJob)만 따로 실행한다. 스케줄로는 돌지 않는다.
+# 직접 실행: kubectl -n dangubi create job --from=cronjob/ingest ingest-manual-$(date +%s)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: ingest
+spec:
+  # 스케줄로 실행하지 않는다. 
+  # (1) suspend (2) 2/31 실행
+  suspend: true
+  schedule: "0 0 31 2 *"
+  timeZone: Asia/Seoul
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      # 2시간이 넘으면 강제 종료
+      activeDeadlineSeconds: 7200
+      # 끝난 Job과 파드를 하루 뒤 자동 삭제
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: ingest
+            image: dangubi-batch
+            args:
+            - --spring.batch.job.name=ingestJob
+            envFrom:
+            - configMapRef:
+                name: batch-config
+            - secretRef:
+                name: batch-db-cred
+            env:
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=75
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                memory: 1Gi

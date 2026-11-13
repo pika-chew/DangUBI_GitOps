@@ -10,12 +10,11 @@ metadata:
     argocd.argoproj.io/sync-wave: "3"
 spec:
   project: dangubi-workloads
-
   source:
     repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
     targetRevision: main
     path: manifests/workloads/query
-
+    
   destination:
     server: https://kubernetes.default.svc
     namespace: dangubi

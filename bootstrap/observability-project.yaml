@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dangubi-observability
+  namespace: argocd
+spec:
+  description: 클러스터 메트릭 수집기(Alloy, kube-state-metrics) 관리. 백엔드는 K8s 밖 모니터링 VM
+  sourceRepos:
+    - https://github.com/pika-chew/DangUBI_GitOps.git
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+  # Namespace는 dangubi-platform이 만든다. 수집기는 클러스터 전체를 읽는 RBAC만 필요하다.
+  clusterResourceWhitelist:
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+  namespaceResourceBlacklist:
+    - group: argoproj.io
+      kind: Application
+    - group: argoproj.io
+      kind: ApplicationSet
+    - group: argoproj.io
+      kind: AppProject

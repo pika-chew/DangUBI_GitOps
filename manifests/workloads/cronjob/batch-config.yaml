@@ -1,8 +1,7 @@
-# batch-config (ConfigMap)
-# - 역할: 배치 앱 작업들이 같이 쓰는 비밀이 아닌 설정. 각 CronJob이 envFrom으로 읽는다.
-# - 채울 것: SPRING_PROFILES_ACTIVE, SPRING_DATASOURCE_URL(MySQL Router RW 주소),
-#           MongoDB를 쓰는 작업(reconcile 등)이 있으면 그 설정
 apiVersion: v1
+data:
+  SPRING_PROFILES_ACTIVE: prod
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-router.dangubi-data.svc.cluster.local:3306/ubi
 kind: ConfigMap
 metadata:
   name: batch-config

@@ -1,0 +1,470 @@
+# 노드마다 Alloy 1개(DaemonSet)를 띄워 클러스터 메트릭을 수집하고
+# K8s 밖 모니터링 VM의 Prometheus로 remote write한다.
+#
+# 수집 대상
+#   - 노드 자원: 내장 unix exporter(node_exporter), 호스트 /proc·/sys·/ 를 마운트해 읽는다
+#   - kubelet, cAdvisor: 각 Alloy가 자기 노드의 kubelet(10250)만 scrape
+#   - kube-state-metrics: 클러스터에 1개이므로 클러스터링으로 Alloy 중 하나만 scrape
+#   - 컨트롤 플레인(API 서버·etcd·scheduler·controller-manager): 컨트롤 플레인 노드의 Alloy가 자기 노드만 scrape
+#   - CoreDNS: 각 Alloy가 자기 노드에 뜬 CoreDNS Pod만 scrape
+#   - Alloy 자기 감시
+
+# PodLogs 등 Alloy CRD는 쓰지 않는다. AppProject도 CRD 생성을 허용하지 않는다.
+crds:
+  create: false
+
+# Alloy 설정 부분, 무엇을 수집해서 어디로 보낼지 정의한다.
+# 수집 대상은 총 5가지 [ 1. 노드 자원, 2. kubelet, 3. 컨테이너 자원(cAdvisor), 4. k8s 오브젝트(kube-state-metrics), 5. Alloy 자기 감시 ]
+# 수집 대상 5가지는 모두 같은 패턴을 따른다.
+# 대상 찾기(exporter·discovery) → 라벨 정리(discovery.relabel) → 수집(prometheus.scrape) → 전송
+
+alloy:
+  configMap:
+    content: |
+      // ---------- 노드 자원 ----------
+      // K8s 노드(OpenStack VM)의 CPU·메모리·디스크·네트워크 사용량을 수집한다.
+      prometheus.exporter.unix "node" {
+        procfs_path = "/host/proc"
+        sysfs_path  = "/host/sys"
+        rootfs_path = "/host/root"
+
+        filesystem {
+          // Pod 볼륨·컨테이너 오버레이는 노드 디스크 지표에서 제외한다.
+          mount_points_exclude = "^/(dev|proc|sys|run|var/lib/kubelet|var/lib/containerd|run/containerd)($|/)"
+          fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs)$"
+        }
+
+        netdev {
+          // Calico 가상 인터페이스는 Pod마다 생겨서 제외한다.
+          device_exclude = "^(cali.*|vxlan\\.calico|tunl.*|veth.*|lo)$"
+        }
+
+        netclass {
+          // node_network_up 등 인터페이스 정보 지표에서도 같은 인터페이스를 제외한다.
+          ignored_devices = "^(cali.*|vxlan\\.calico|tunl.*|veth.*|lo)$"
+        }
+      }
+
+      discovery.relabel "node" {
+        targets = prometheus.exporter.unix.node.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = sys.env("NODE_NAME")
+        }
+
+        // exporter 대상에는 job="integrations/unix"가 이미 붙어 있어 scrape의 job_name이 무시된다.
+        // 물리 노드(2단계)와 구분되도록 job을 직접 덮어쓴다.
+        rule {
+          target_label = "job"
+          replacement  = "node"
+        }
+      }
+
+      prometheus.scrape "node" {
+        targets         = discovery.relabel.node.output
+        scrape_interval = "30s"
+        forward_to      = [prometheus.remote_write.default.receiver]
+      }
+
+      // ---------- kubelet, cAdvisor (자기 노드만) ----------
+      discovery.kubernetes "kubelet" {
+        role = "node"
+
+        // Alloy가 자기 노드의 kubelet만 scrape하도록 한다.
+        selectors {
+          role  = "node"
+          field = "metadata.name=" + sys.env("NODE_NAME")
+        }
+      }
+
+      discovery.relabel "kubelet" {
+        targets = discovery.kubernetes.kubelet.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_node_name"]
+          target_label  = "instance"
+        }
+      }
+
+      prometheus.scrape "kubelet" {
+        targets           = discovery.relabel.kubelet.output
+        job_name          = "kubelet"
+        scrape_interval   = "30s"
+        scheme            = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        forward_to        = [prometheus.remote_write.default.receiver]
+
+        // kubeadm 기본 kubelet 인증서는 자체 서명이다.
+        tls_config {
+          insecure_skip_verify = true
+        }
+      }
+
+      // cAdvisor는 kubelet이 내장하고 있다. Alloy가 자기 노드의 cAdvisor만 scrape하도록 한다.
+      prometheus.scrape "cadvisor" {
+        targets           = discovery.relabel.kubelet.output
+        job_name          = "cadvisor"
+        metrics_path      = "/metrics/cadvisor"
+        scrape_interval   = "30s"
+        scheme            = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        forward_to        = [prometheus.relabel.cadvisor.receiver]
+
+        tls_config {
+          insecure_skip_verify = true
+        }
+      }
+
+      // cAdvisor는 컨테이너마다 지표를 많이 만든다. 쓰지 않는 것을 버리고 전송한다.
+      prometheus.relabel "cadvisor" {
+        forward_to = [prometheus.remote_write.default.receiver]
+
+        // 잘 쓰지 않는 지표
+        //   tasks_state              : 컨테이너 안 프로세스의 상태별 개수(sleeping·running 등)
+        //   memory_failures_total    : 메모리 페이지 할당 실패(page fault) 횟수. OOM은 kube-state-metrics로 본다
+        //   blkio_device_usage_total : 디스크 장치별 I/O 사용량. 디스크 I/O는 노드 자원 지표로 본다
+        //   file_descriptors         : 열린 파일 디스크립터 수
+        //   sockets                  : 열린 소켓 수
+        //   threads_max              : 허용 스레드 최대값(설정값이라 변하지 않음)
+        //   ulimits_soft             : ulimit 소프트 한도(설정값이라 변하지 않음)
+        rule {
+          source_labels = ["__name__"]
+          regex         = "container_(tasks_state|memory_failures_total|blkio_device_usage_total|file_descriptors|sockets|threads_max|ulimits_soft)"
+          action        = "drop"
+        }
+
+        // container 라벨이 빈 container_* 지표(시스템 cgroup, Pod 합계). Pod 합계는 sum by (pod)로 계산한다.
+        // container_ 지표에만 적용해 up·scrape_*(수집 상태)와 machine_*(노드 사양)은 남긴다.
+        rule {
+          source_labels = ["__name__", "container"]
+          regex         = "container_.+;"
+          action        = "drop"
+        }
+      }
+
+      // ---------- kube-state-metrics ----------
+      // 클러스터에 1개뿐이라 Alloy 7개가 모두 수집하면 같은 데이터가 7번 저장된다.
+      // 클러스터링으로 Alloy 중 1개만 담당해 수집하고, 담당이 죽으면 다른 Alloy가 넘겨받는다.
+      discovery.kubernetes "ksm" {
+        role = "service"
+
+        namespaces {
+          names = ["monitoring"]
+        }
+
+        selectors {
+          role  = "service"
+          label = "app.kubernetes.io/name=kube-state-metrics"
+        }
+      }
+
+      discovery.relabel "ksm" {
+        targets = discovery.kubernetes.ksm.targets
+
+        // Service의 포트 중 메트릭 포트(http, 8080)만 남긴다.
+        rule {
+          source_labels = ["__meta_kubernetes_service_port_name"]
+          regex         = "http"
+          action        = "keep"
+        }
+      }
+
+      prometheus.scrape "ksm" {
+        targets    = discovery.relabel.ksm.output
+        job_name        = "kube-state-metrics"
+        scrape_interval = "30s"
+        // kube-state-metrics가 붙인 namespace·pod 라벨을 그대로 쓴다.
+        honor_labels    = true
+        forward_to      = [prometheus.remote_write.default.receiver]
+
+        // 대상 1개를 Alloy 7개 중 하나만 가져간다.
+        clustering {
+          enabled = true
+        }
+      }
+
+      // ---------- 컨트롤 플레인 (API 서버·etcd·scheduler·controller-manager) ----------
+      // 자기 노드가 컨트롤 플레인일 때만 대상이 1개 생긴다. 워커의 Alloy는 대상이 비어 수집하지 않는다.
+      discovery.kubernetes "control_plane" {
+        role = "node"
+
+        selectors {
+          role  = "node"
+          field = "metadata.name=" + sys.env("NODE_NAME")
+          label = "node-role.kubernetes.io/control-plane"
+        }
+      }
+
+      discovery.relabel "control_plane" {
+        targets = discovery.kubernetes.control_plane.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_node_name"]
+          target_label  = "instance"
+        }
+      }
+
+      // API 서버는 모든 인터페이스(*:6443)에서 받는다. 노드 주소(IP:10250)의 포트만 바꾼다.
+      discovery.relabel "apiserver" {
+        targets = discovery.relabel.control_plane.output
+
+        rule {
+          source_labels = ["__address__"]
+          regex         = "([^:]+):.*"
+          replacement   = "$1:6443"
+          target_label  = "__address__"
+        }
+      }
+
+      // scheduler·controller-manager·etcd는 127.0.0.1에만 열려 있다(kubeadm 기본값).
+      // Alloy가 hostNetwork라서 자기 노드의 localhost로 접근한다.
+      discovery.relabel "scheduler" {
+        targets = discovery.relabel.control_plane.output
+
+        rule {
+          target_label = "__address__"
+          replacement  = "127.0.0.1:10259"
+        }
+      }
+
+      discovery.relabel "controller_manager" {
+        targets = discovery.relabel.control_plane.output
+
+        rule {
+          target_label = "__address__"
+          replacement  = "127.0.0.1:10257"
+        }
+      }
+
+      discovery.relabel "etcd" {
+        targets = discovery.relabel.control_plane.output
+
+        rule {
+          target_label = "__address__"
+          replacement  = "127.0.0.1:2381"
+        }
+      }
+
+      // API 서버·scheduler·controller-manager는 HTTPS + 토큰. 인증서는 자체 서명이다.
+      prometheus.scrape "apiserver" {
+        targets           = discovery.relabel.apiserver.output
+        job_name          = "apiserver"
+        scrape_interval   = "30s"
+        scheme            = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        forward_to        = [prometheus.remote_write.default.receiver]
+
+        tls_config {
+          insecure_skip_verify = true
+        }
+      }
+
+      prometheus.scrape "scheduler" {
+        targets           = discovery.relabel.scheduler.output
+        job_name          = "kube-scheduler"
+        scrape_interval   = "30s"
+        scheme            = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        forward_to        = [prometheus.remote_write.default.receiver]
+
+        tls_config {
+          insecure_skip_verify = true
+        }
+      }
+
+      prometheus.scrape "controller_manager" {
+        targets           = discovery.relabel.controller_manager.output
+        job_name          = "kube-controller-manager"
+        scrape_interval   = "30s"
+        scheme            = "https"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        forward_to        = [prometheus.remote_write.default.receiver]
+
+        tls_config {
+          insecure_skip_verify = true
+        }
+      }
+
+      // etcd 메트릭 포트는 HTTP, 인증 없음(--listen-metrics-urls=http://127.0.0.1:2381)
+      prometheus.scrape "etcd" {
+        targets         = discovery.relabel.etcd.output
+        job_name        = "etcd"
+        scrape_interval = "30s"
+        forward_to      = [prometheus.remote_write.default.receiver]
+      }
+
+      // ---------- CoreDNS (자기 노드의 Pod만) ----------
+      discovery.kubernetes "coredns" {
+        role = "pod"
+
+        namespaces {
+          names = ["kube-system"]
+        }
+
+        selectors {
+          role  = "pod"
+          label = "k8s-app=kube-dns"
+          field = "spec.nodeName=" + sys.env("NODE_NAME")
+        }
+      }
+
+      discovery.relabel "coredns" {
+        targets = discovery.kubernetes.coredns.targets
+
+        // Pod 포트 중 메트릭 포트(metrics, 9153)만 남긴다.
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_port_name"]
+          regex         = "metrics"
+          action        = "keep"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "instance"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_node_name"]
+          target_label  = "node"
+        }
+      }
+
+      prometheus.scrape "coredns" {
+        targets         = discovery.relabel.coredns.output
+        job_name        = "coredns"
+        scrape_interval = "30s"
+        forward_to      = [prometheus.remote_write.default.receiver]
+      }
+
+      // ---------- Alloy 자기 감시 ----------
+      prometheus.exporter.self "alloy" { }
+
+      discovery.relabel "alloy" {
+        targets = prometheus.exporter.self.alloy.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = sys.env("NODE_NAME")
+        }
+
+        // 노드 자원과 같은 이유로 job을 직접 덮어쓴다.
+        rule {
+          target_label = "job"
+          replacement  = "alloy"
+        }
+      }
+
+      prometheus.scrape "alloy" {
+        targets         = discovery.relabel.alloy.output
+        scrape_interval = "30s"
+        forward_to      = [prometheus.remote_write.default.receiver]
+      }
+
+      // ---------- 전송 ----------
+      prometheus.remote_write "default" {
+        endpoint {
+          // 모니터링 VM 사설 IP. 보안 그룹에서 172.16.10.0/24 → 9090 허용
+          url = "http://172.16.20.20:9090/api/v1/write"
+        }
+
+        external_labels = {
+          env     = "private",
+          cluster = "k8s",
+        }
+      }
+
+# chart 설정, Alloy DaemonSet을 어떻게 배치할지 정의한다.
+
+  # kube-state-metrics 대상을 Alloy끼리 나눠 갖는다.
+  clustering:
+    enabled: true
+
+  # Grafana로 사용 통계를 보내지 않는다.
+  enableReporting: false
+
+  # 설정에서 sys.env("NODE_NAME")으로 자기 노드를 구분한다.
+  extraEnv:
+    - name: NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+
+  # 노드 메트릭용 호스트 경로. 읽기 전용
+  mounts:
+    extra:
+      - name: proc
+        mountPath: /host/proc
+        readOnly: true
+      - name: sys
+        mountPath: /host/sys
+        readOnly: true
+      - name: root
+        mountPath: /host/root
+        readOnly: true
+        mountPropagation: HostToContainer
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# 클러스터 전체를 읽기만 한다. chart 기본값의 Secret·ConfigMap 읽기 권한은 뺐다.
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["nodes", "services", "endpoints", "pods", "namespaces"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["discovery.k8s.io"]
+      resources: ["endpointslices"]
+      verbs: ["get", "list", "watch"]
+  clusterRules:
+    # kubelet /metrics, /metrics/cadvisor 접근
+    - apiGroups: [""]
+      resources: ["nodes/metrics"]
+      verbs: ["get"]
+    # API 서버·scheduler·controller-manager의 /metrics 접근
+    - nonResourceURLs: ["/metrics"]
+      verbs: ["get"]
+
+controller:
+  type: daemonset
+
+  # 노드의 네트워크 지표를 읽고, 노드 IP로 모니터링 VM에 전송한다.
+  hostNetwork: true
+  # hostNetwork에서도 클러스터 DNS(kube-state-metrics.monitoring 등)를 쓴다.
+  dnsPolicy: ClusterFirstWithHostNet
+
+  # 컨트롤 플레인 3대에도 배치한다.
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+  volumes:
+    extra:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: root
+        hostPath:
+          path: /
+
+# ---------- 이후 단계(4단계)에서 추가할 것 ----------
+# 1. 앱 트레이스·메트릭 수신(OTLP) → Tempo
+#    - 설정: otelcol.receiver.otlp(gRPC 4317, HTTP 4318) → otelcol.processor.batch
+#            → 트레이스는 otelcol.exporter.otlp(Tempo), 앱 메트릭은 otelcol.exporter.prometheus → remote_write
+#    - chart: alloy.extraPorts에 4317·4318 추가. 앱은 Service(alloy.monitoring)나 노드 IP로 전송
+#    - vehicleId·좌표 등 민감 속성은 otelcol.processor.attributes로 해시·제거
+# 2. Pod 로그 수집 → Loki
+#    - 설정: discovery.kubernetes(pod, 자기 노드만) → loki.source.kubernetes 또는 local.file_match + loki.source.file
+#            → loki.process(마스킹, trace_id 추출) → loki.write(모니터링 VM Loki)
+#    - chart: 파일 방식이면 alloy.mounts.varlog: true. RBAC에 pods/log 추가(API 방식)
+#    - Loki 라벨에 vehicleId·userId·trace_id 같은 고유값을 넣지 않는다
+#    - 보안 그룹에 172.16.10.0/24 → Loki 포트(3100) 허용
