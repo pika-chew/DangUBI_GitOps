@@ -1,7 +1,21 @@
-# collector (Service)
-# - 역할: Collector API 접속 주소.
-# - 채울 것: type(클러스터 내부만이면 ClusterIP, MetalLB 외부 IP가 필요하면 LoadBalancer), selector, ports
-apiVersion: v1
-kind: Service
-metadata:
-  name: collector
+# collector (Service) — 현재 사용 안 함
+# - Collector는 SQS에서 메시지를 가져와 S3·MySQL로 처리하는 워커다. 밖에서 Collector로 들어오는 요청이 없어 Service가 필요 없다.
+# - probe는 kubelet이 파드에 직접 검사하므로 Service와 무관하다.
+# - 다시 쓸 때: Collector에 API를 추가하거나 Prometheus 메트릭을 수집할 때 주석을 풀고,
+#   kustomization.yaml의 `- service.yaml` 줄도 함께 푼다.
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   labels:
+#     app: collector
+#   name: collector
+# spec:
+#   ports:
+#   - name: http
+#     port: 80
+#     protocol: TCP
+#     targetPort: http
+#   selector:
+#     app: collector
+#   type: ClusterIP
+
