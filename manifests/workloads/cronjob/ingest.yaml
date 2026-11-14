@@ -23,7 +23,7 @@ spec:
           restartPolicy: Never
           containers:
           - name: ingest
-            image: dangubi-batch
+            image: dangubi-cronjob
             args:
             - --spring.batch.job.name=ingestJob
             envFrom:
