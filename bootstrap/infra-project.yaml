@@ -44,6 +44,8 @@ spec:
       kind: ValidatingWebhookConfiguration
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration
+    - group: external-secrets.io
+      kind: ClusterSecretStore
   namespaceResourceBlacklist:
     - group: argoproj.io
       kind: Application
