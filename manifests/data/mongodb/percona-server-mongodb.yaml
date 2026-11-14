@@ -1,0 +1,51 @@
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: dangubi-mongodb
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  crVersion: 1.23.1 # Percona Operator 리소스 설정 버전
+  image: docker.io/percona/percona-server-mongodb:8.0.32-14 # DB 버전
+  imagePullPolicy: IfNotPresent
+  updateStrategy: SmartUpdate # 변경 적용시 Secondary 부터 교체하고 Primary를 나중에 교체
+  upgradeOptions:
+    apply: disabled # Operator가 DB 버전을 자동으로 올리지 못하게
+  tls:
+    # 내부 복제에는 TLS를 사용하고 기존 클라이언트의 SCRAM 접속도 허용한다.
+    mode: preferTLS
+  sharding:
+    enabled: false
+  replsets:
+    - name: rs0
+      size: 3
+      affinity:
+        antiAffinityTopologyKey: kubernetes.io/hostname # 서로다른 노드에 배치
+      expose:
+        enabled: false # Operator의 외부 노출 X -> 서비스 주소로 접속
+      # 초기화 컨테이너도 이 리소스 값을 사용한다.
+      resources:
+        requests:
+          cpu: 500m
+          memory: 4Gi
+        limits:
+          memory: 4Gi
+      volumeSpec:
+        persistentVolumeClaim:
+          storageClassName: local-mongodb
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 20Gi
+  # Operator가 계정과 비밀번호를 생성한다. 쓰기·조회 권한은 분리한다.
+  users:
+    - name: ubi_sink
+      db: ubi_read
+      roles:
+        - name: readWrite
+          db: ubi_read
+    - name: ubi_query
+      db: ubi_read
+      roles:
+        - name: read
+          db: ubi_read

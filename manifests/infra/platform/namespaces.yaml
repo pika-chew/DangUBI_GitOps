@@ -66,3 +66,14 @@ metadata:
   annotations:
     # 수집기 Namespace를 보존한다.
     argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mysql-operator
+  labels:
+    app.kubernetes.io/part-of: dangubi
+  annotations:
+    # MySQL 클러스터를 관리하는 컨트롤러의 네임스페이스를 보존한다.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+

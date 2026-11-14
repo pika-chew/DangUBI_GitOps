@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  # StatefulSet의 datadir PVC 이름과 일치해야 0번 멤버가 이 클레임을 재사용한다.
+  name: datadir-dangubi-mysql-0
+  namespace: dangubi-data
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  storageClassName: cinder-mysql-cmp1
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi

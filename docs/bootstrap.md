@@ -13,7 +13,7 @@
 | AppProject | 배포 네임스페이스 | 담당 리소스 |
 | --- | --- | --- |
 | `dangubi-root` | `argocd` | 하위 Application만 |
-| `dangubi-infra` | `kube-system`, `metallb-system`, `argo-rollouts`, `external-secrets`, `dangubi-data`, `dangubi` | 플랫폼, Namespace, PV, StorageClass, CRD 등 |
+| `dangubi-infra` | `kube-system`, `metallb-system`, `argo-rollouts`, `external-secrets`, `mysql-operator`, `dangubi-data`, `dangubi` | 플랫폼, Namespace, PV, StorageClass, CRD 등 |
 | `dangubi-data` | `dangubi-data` | MySQL, MongoDB, Kafka, Kafka Connect |
 | `dangubi-workloads` | `dangubi` | Command, Query |
 
@@ -26,7 +26,7 @@ AppProject와 부모 Application은 Ansible로 설치한 Argo CD의 `argocd` 네
 AppProject 이름에 `dangubi-`를 붙여 다른 프로젝트와 구분한다.
 
 root·data·workloads 프로젝트는 이 GitOps 레포만 허용한다.
-infra 프로젝트는 Cinder CSI, External Secrets Operator, Argo Rollouts의 Helm 차트 저장소도 허용한다.
+infra 프로젝트는 Cinder CSI, External Secrets Operator, MySQL Operator, Percona Operator, Argo Rollouts의 Helm 차트 저장소도 허용한다.
 외부 Helm chart를 추가로 도입할 때 해당 프로젝트에 정확한 chart 저장소 URL을 추가한다.
 Operator를 도입하면 컨트롤러·CRD는 infra에서, 클러스터 정의는 data에서 관리한다.
 Calico와 OpenStack CCM은 기존 Ansible에서 계속 관리한다.
@@ -76,6 +76,7 @@ kubectl -n argocd describe application dangubi-root
 - `metallb-system`: MetalLB
 - `argo-rollouts`: Argo Rollouts
 - `external-secrets`: External Secrets Operator
+- `mysql-operator`: MySQL Operator
 
 기존 `kube-system`과 별도로 설치한 `argocd`는 이 Application에서 관리하지 않는다.
 여러 네임스페이스를 다루므로 Kustomize의 공통 `namespace` 변환은 사용하지 않는다.
@@ -143,7 +144,7 @@ LimitRange의 자동 기본값도 적용하지 않으므로 배포 파일에 자
 
 ```sh
 kubectl -n argocd get application dangubi-platform
-kubectl get namespace dangubi dangubi-data metallb-system argo-rollouts external-secrets
+kubectl get namespace dangubi dangubi-data metallb-system argo-rollouts external-secrets mysql-operator
 kubectl -n dangubi-data describe resourcequota dangubi-data-compute
 kubectl -n dangubi describe resourcequota dangubi-workloads-compute
 ```
@@ -165,6 +166,31 @@ kubectl get crd externalsecrets.external-secrets.io clustersecretstores.external
 
 Kafka Connect가 참조하는 `ClusterSecretStore/vault`와 실제 Vault 접속 설정은 별도로 구성한다.
 Secret 생성 여부는 Store가 준비된 뒤 `ExternalSecret`의 Ready 상태로 확인한다.
+
+## MySQL Operator
+
+`dangubi-mysql-operator`는 공식 chart `2.3.1`로 MySQL Operator와 `InnoDBCluster` CRD를 설치한다.
+Operator는 `mysql-operator` 네임스페이스에 한 개를 실행하고 `dangubi-data`를 감시한다.
+이미 다른 MySQL Operator가 같은 범위를 감시한다면 기존 설치의 관리 주체를 확인한다.
+기존 Argo CD에는 병합 후 `kubectl apply -f bootstrap/infra-project.yaml`로 chart 저장소와 대상
+네임스페이스 허용을 반영한다. MySQL 클러스터를 등록하기 전에 아래 준비 상태를 확인한다.
+
+```sh
+kubectl -n mysql-operator rollout status deployment/mysql-operator --timeout=300s
+kubectl wait --for=condition=Established crd/innodbclusters.mysql.oracle.com --timeout=120s
+```
+
+## MongoDB Operator
+
+`dangubi-mongodb-operator`는 Percona의 `psmdb-operator-crds`와 `psmdb-operator` chart
+`1.23.1`을 사용한다. 컨트롤러는 `dangubi-data`에 설치하고 해당 네임스페이스만 감시한다.
+기존 Argo CD에는 갱신된 `bootstrap/infra-project.yaml`을 적용해 chart 저장소를 허용한다.
+MongoDB Application을 동기화하기 전에 컨트롤러와 CRD가 준비됐는지 확인한다.
+
+```sh
+kubectl -n dangubi-data rollout status deployment/dangubi-mongodb-operator-psmdb-operator --timeout=300s
+kubectl wait --for=condition=Established crd/perconaservermongodbs.psmdb.percona.com --timeout=120s
+```
 
 ## Argo Rollouts
 
