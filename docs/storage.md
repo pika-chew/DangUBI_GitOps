@@ -116,9 +116,11 @@ Horizon에서 호스트가 표시되지 않으면 OpenStack 담당자에게 볼�
 멤버당 PVC는 `20Gi`로 시작한다. 0번은 `cinder-mysql-cmp1`, 나머지 두 멤버는 `cinder-retain`을 사용한다.
 `cinder-retain`을 사용하는 멤버의 실제 백엔드는 Cinder의 기본 정책에 따라 결정된다.
 
-최초 동기화 전에 MySQL Operator와 두 StorageClass가 준비됐는지 확인한다.
-`dangubi-data`에 초기 관리자 Secret `dangubi-mysql-root`를 준비한다. Secret에 `rootUser`, `rootPassword`를
-넣고 필요한 경우 `rootHost`를 지정한다. 자격 증명은 Git에 기록하지 않는다.
+최초 동기화 전에 MySQL Operator, 두 StorageClass, `ClusterSecretStore/vault`가 준비됐는지 확인한다.
+Vault의 `ubi/mysql/root`에 `rootUser`, `rootPassword`를 준비한다.
+동기화 시 External Secrets Operator가 `dangubi-data/dangubi-mysql-root` Secret을 먼저 만든다.
+기존 배포를 전환할 때는 현재 관리자 계정과 같은 값을 Vault에 등록한다. 초기화 이후 관리자 비밀번호 변경은
+MySQL 계정과 Vault 값을 함께 변경하는 절차가 필요하다.
 
 먼저 0번 멤버의 PVC를 적용하고 클래스 이름을 확인한다.
 
