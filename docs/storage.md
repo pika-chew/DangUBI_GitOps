@@ -201,6 +201,16 @@ df -hT /mnt/data/mongodb
 
 ### 최초 동기화와 앱 접속
 
+동기화 전에 `ClusterSecretStore/vault`가 준비됐는지 확인하고 아래 값을 Vault에 등록한다.
+
+| Vault 경로 | 필드 | MongoDB 계정 |
+| --- | --- | --- |
+| `ubi/kafka-connect/mongo` | `password` | `ubi_sink` (`readWrite`) |
+| `ubi/query/mongo` | `password` | `ubi_query` (`read`) |
+
+이전 설정에서 `uri`만 사용했다면 배포 전에 각 경로에 `password` 필드를 추가한다.
+기존 MongoDB 계정이 있다면 전환 시 현재 사용 중인 비밀번호를 등록한다.
+
 Argo CD에서 `dangubi-mongodb`를 수동 동기화한다. Operator가 Replica Set을 초기화하므로
 `rs.initiate()`와 수동 keyfile 생성 절차는 생략한다. `PerconaServerMongoDB` 상태가 `ready`인지,
 StatefulSet과 PVC 3개가 준비됐는지 확인한다.
@@ -211,13 +221,11 @@ kctl -n dangubi-data get statefulset dangubi-mongodb-rs0
 kctl -n dangubi-data get pvc,pod -o wide
 ```
 
-Operator는 `ubi_read` DB에 Sink 전용 `ubi_sink`(`readWrite`)와 Query 전용
-`ubi_query`(`read`)를 생성한다. 생성된 비밀번호는 `dangubi-mongodb-custom-user-secret`에,
-계정별 URI는 `dangubi-mongodb-custom-user-secret-conn-str`에 저장된다.
-
-Kafka Connect는 기존대로 Vault `ubi/kafka-connect/mongo`의 `uri`를 읽는다.
-Kafka Connect 담당자는 `ubi_sink` 자격 증명과 새 Replica Set 주소를 Vault에 등록한다.
-Query API에는 `ubi_query` 자격 증명을 별도로 전달한다.
+ESO가 `dangubi-data/dangubi-mongodb-app-passwords`를 먼저 생성하고, Percona Operator는
+이 Secret을 읽어 `ubi_read` DB의 두 계정을 구성한다. 클러스터의 시스템 계정과 내부 인증 키는 Operator가 관리한다.
+Kafka Connect와 Query API의 ExternalSecret은 같은 Vault 비밀번호에 URL 인코딩을 적용해 각자 접속 URI를 만든다.
+Sink는 `dangubi-data/mongo-cred`의 `uri`를, Query API는 `dangubi/query-mongo-cred`의
+`SPRING_DATA_MONGODB_URI`를 사용한다.
 
 `tls.mode: preferTLS`는 멤버 간 TLS를 사용하며, 기존 인증서 미탑재 클라이언트는 아래처럼
 내부 주소로 SCRAM 접속할 수 있다. TLS를 사용하는 클라이언트에는 Operator가 생성한 URI와

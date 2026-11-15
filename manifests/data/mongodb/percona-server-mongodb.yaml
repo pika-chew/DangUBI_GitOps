@@ -37,15 +37,21 @@ spec:
           resources:
             requests:
               storage: 20Gi
-  # Operator가 계정과 비밀번호를 생성한다. 쓰기·조회 권한은 분리한다.
+  # Operator가 Vault에서 동기화한 비밀번호로 쓰기·조회 계정을 구성한다.
   users:
     - name: ubi_sink
       db: ubi_read
+      passwordSecretRef:
+        name: dangubi-mongodb-app-passwords
+        key: sink-password
       roles:
         - name: readWrite
           db: ubi_read
     - name: ubi_query
       db: ubi_read
+      passwordSecretRef:
+        name: dangubi-mongodb-app-passwords
+        key: query-password
       roles:
         - name: read
           db: ubi_read
