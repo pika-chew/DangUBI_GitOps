@@ -10,6 +10,7 @@ namespace: dangubi-data
 # 목록 순서는 읽는 순서(Secret → 권한 → Connect → 커넥터)에 맞췄다.
 resources:
   - externalsecrets.yaml
+  - ghcr-pull-externalsecret.yaml   # GHCR 비공개 이미지 pull 계정 (collector·cronjob과 같은 Vault 경로)
   - rbac.yaml
   - kafka-connect.yaml
   - connector-debezium-outbox.yaml
