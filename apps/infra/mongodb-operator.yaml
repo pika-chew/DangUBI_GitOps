@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dangubi-mongodb-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  project: dangubi-infra
+  sources:
+    - repoURL: https://percona.github.io/percona-helm-charts/
+      chart: psmdb-operator-crds
+      targetRevision: 1.23.1
+    - repoURL: https://percona.github.io/percona-helm-charts/
+      chart: psmdb-operator
+      targetRevision: 1.23.1
+      helm:
+        releaseName: dangubi-mongodb-operator
+        # CRD는 위의 전용 차트에서 한 번만 배포한다.
+        skipCrds: true
+        valueFiles:
+          - $values/helm/mongodb-operator/values.yaml
+    - repoURL: https://github.com/pika-chew/DangUBI_GitOps.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dangubi-data
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

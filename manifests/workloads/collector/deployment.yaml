@@ -23,64 +23,54 @@ spec:
           labelSelector:
             matchLabels:
               app: collector
-      # 파드 교체 시 진행 중인 요청을 마무리할 시간(초). 
-      # 앱에 server.shutdown=graceful 설정이 있어야 효과가 있다.
+      # 파드 종료 시 SIGTERM을 받은 워커가 정리할 시간(초).
+      # 처리 중이던 SQS 메시지는 삭제되지 않고 큐로 돌아가 다른 파드가 다시 처리한다.
       terminationGracePeriodSeconds: 30
-      # GHCR 비공개 이미지를 받기 위한 인증 Secret (ghcr-pull-externalsecret.yaml이 만든다).
       imagePullSecrets:
       - name: collector-ghcr-pull
       containers:
       # kustomization.yaml images의 name과 같은 값. 실제 주소·태그는 그쪽에서 바뀐다.
       - image: dangubi-collector
         name: dangubi-be-collector
+        # 바이너리는 --worker 인자가 있어야 SQS 폴링을 시작한다.
+        args: ["--worker"]
         ports:
-        # 포트에 이름을 붙여 probe와 Service(targetPort: http)가 번호 대신 이름으로 가리키게 한다.
         - name: http
           containerPort: 8080
-        # 비밀이 아닌 설정(프로필, DB 주소)은 ConfigMap에서 통째로 환경 변수로 받는다.
+        # 비밀이 아닌 설정(SQS·S3·리전)은 ConfigMap에서 통째로 환경 변수로 받는다.
         envFrom:
         - configMapRef:
             name: collector-config
-        env:
-        # DB 계정은 ExternalSecret이 만든 Secret에서 받는다. key는 externalsecret.yaml의 secretKey와 같아야 한다.
-        - name: SPRING_DATASOURCE_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: collector-mysql-cred
-              key: username
-        - name: SPRING_DATASOURCE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: collector-mysql-cred
-              key: password
-        # JVM 힙을 메모리 limit의 75%로 맞춘다. 없으면 힙이 limit을 넘어 OOMKilled될 수 있다.
-        - name: JAVA_TOOL_OPTIONS
-          value: -XX:MaxRAMPercentage=75
+        # AWS·Swift 인증 정보와 Swift 컨테이너명·인증 URL. Secret의 키가 곧 환경 변수 이름이다(externalsecret.yaml의 collector-cloud-cred).
+        - secretRef:
+            name: collector-cloud-cred
         resources:
           requests:
-            cpu: 250m
-            memory: 512Mi
+            cpu: 50m
+            memory: 64Mi
           limits:
-            memory: 1Gi
-        # Spring Boot Actuator 기준 경로.
-        # startupProbe: 시작이 느린 Spring이 다 뜰 때까지(최대 5초 x 30 = 150초) 아래 두 probe를 미룬다.
+            memory: 256Mi
+        # startupProbe: 시작 시 Swift 인증·컨테이너 확인(최대 30초)이 끝나야 헬스 서버가 뜬다.
+        # 최대 5초 x 12 = 60초 동안 아래 두 probe를 미룬다.
         startupProbe:
           httpGet:
-            path: /actuator/health/liveness
+            path: /livez
             port: http
           periodSeconds: 5
-          failureThreshold: 30
-        # readinessProbe: 실패하면 Service가 이 파드로 트래픽을 보내지 않는다(재시작은 안 함).
+          failureThreshold: 12
+        # readinessProbe: 최근 SQS 수신과 Swift 컨테이너 조회가 성공했는지 본다(실패해도 재시작은 안 함).
+        # 앱 쪽 Swift 확인 제한이 2초라 timeout을 3초로 둔다.
         readinessProbe:
           httpGet:
-            path: /actuator/health/readiness
+            path: /readyz
             port: http
+          timeoutSeconds: 3
           periodSeconds: 10
           failureThreshold: 3
-        # livenessProbe: 실패하면 컨테이너를 재시작한다(앱이 멈춘 경우).
+        # livenessProbe: HTTP 서버 응답만 본다. 외부 서비스 장애로 재시작되지 않게 앱이 이렇게 나눠 두었다.
         livenessProbe:
           httpGet:
-            path: /actuator/health/liveness
+            path: /livez
             port: http
           periodSeconds: 10
           failureThreshold: 3

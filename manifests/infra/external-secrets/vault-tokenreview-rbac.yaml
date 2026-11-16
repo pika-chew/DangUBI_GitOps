@@ -1,0 +1,17 @@
+# Vault가 ESO의 로그인 토큰을 검증할 수 있게 하는 권한
+# Vault는 로그인 요청으로 받은 ESO의 JWT를 그 JWT 자체로 TokenReview API에 보내 진짜인지 확인한다.
+# 그래서 Vault에 장기 리뷰어 토큰(token_reviewer_jwt)을 두지 않아도 된다. 이 바인딩이 없으면 Vault 로그인이 403으로 실패한다.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: eso-vault-tokenreview
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  # k8s 기본 ClusterRole. tokenreviews·subjectaccessreviews 생성 권한만 있다.
+  name: system:auth-delegator
+subjects:
+  # cluster-secret-store.yaml의 serviceAccountRef와 같은 SA
+  - kind: ServiceAccount
+    name: dangubi-external-secrets
+    namespace: external-secrets

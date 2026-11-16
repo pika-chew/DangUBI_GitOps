@@ -5,7 +5,7 @@ kind: Kustomization
 namespace: dangubi
 
 resources:
-  - externalsecret.yaml   # MySQL 접속 계정 (Vault → Secret)
+  - externalsecret.yaml   # AWS·Swift 인증 정보 (Vault → Secret)
   - ghcr-pull-externalsecret.yaml   # GHCR 비공개 이미지 pull 계정 (Vault → Secret)
   - configmap.yaml        # 비밀이 아닌 설정
   - deployment.yaml       # API 파드

@@ -1,0 +1,7 @@
+# 단일 Operator로 dangubi-data의 InnoDBCluster를 감시한다.
+# standalone과 감시 네임스페이스는 최초 설치 후 변경할 수 없다.
+replicas: 1
+deployment:
+  standalone: true # 여러 Operator 간 리더 선출에 쓰는 Kopf peering 객체를 만들지 않음
+  namespaces:
+    - dangubi-data

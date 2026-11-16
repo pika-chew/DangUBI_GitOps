@@ -1,0 +1,8 @@
+# ESO가 Vault에 접속하기 위한 클러스터 설정 묶음. apps/infra/external-secrets.yaml이 chart와 함께 이 경로를 동기화한다.
+# 두 리소스 모두 클러스터 범위라 namespace를 지정하지 않는다.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - cluster-secret-store.yaml        # Vault 접속 정보 (모든 ExternalSecret의 storeRef "vault")
+  - vault-tokenreview-rbac.yaml      # Vault가 ESO 토큰을 검증할 수 있게 하는 권한
