@@ -6,11 +6,15 @@ namespace: dangubi
 
 resources:
   - externalsecret.yaml   # MySQL 접속 계정 (Vault → Secret)
+  - ghcr-pull-externalsecret.yaml   # GHCR 비공개 이미지 pull 계정 (Vault → Secret)
   - configmap.yaml        # 비밀이 아닌 설정
   - deployment.yaml       # API 파드
   # - service.yaml        # 현재 사용 안 함 (SQS 워커라 들어오는 요청 없음, 이유는 파일 상단 참고)
 
+# DangUBI_Collector의 Jenkins main 빌드가 name이 dangubi-collector인 항목을 찾아
+# newTag(커밋 SHA 7자리)를 바꾸고 그 아래에 digest 줄을 쓴다. name과 줄 구성을 바꾸지 않는다.
+# "initial"은 첫 빌드 전 자리표시 값이라 실제 이미지가 없다.
 images:
-  - name: dangubi-be-collector
-    newName: ghcr.io/pika-chew/dangubi-be-collector
-    newTag: 0.1.0
+  - name: dangubi-collector
+    newName: ghcr.io/pika-chew/dangubi-collector
+    newTag: "initial"

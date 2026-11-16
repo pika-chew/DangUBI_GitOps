@@ -7,6 +7,7 @@ resources:
   # 배치 앱 공용
   - batch-config.yaml           # 공용 설정
   - batch-externalsecret.yaml   # 공용 DB 계정
+  - ghcr-pull-externalsecret.yaml   # GHCR 비공개 이미지 pull 계정
   # 스케줄 작업 (시간순)
   # db-backup·monthly-finalize·cleanup은 아직 spec이 없는 틀이라 동기화에서 뺀다.
   # spec(schedule·jobTemplate)이 없는 CronJob은 API 서버 검증에서 거부되고, 그러면 이 앱 전체 sync가 실패한다.
@@ -19,3 +20,22 @@ resources:
   - reconcile.yaml
   - ingest.yaml
   - score.yaml
+
+# 모든 CronJob의 Pod에 GHCR pull Secret을 붙인다. 새 CronJob을 추가해도 따로 적지 않아도 된다.
+patches:
+  - target:
+      kind: CronJob
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/imagePullSecrets
+        value:
+          - name: batch-ghcr-pull
+
+# DangUBI_CronJob의 Jenkins main 빌드가 name이 dangubi-cronjob인 항목을 찾아
+# newTag(커밋 SHA 7자리)를 바꾸고 그 아래에 digest 줄을 쓴다. name과 줄 구성을 바꾸지 않는다.
+# 각 CronJob의 image는 이 name(dangubi-cronjob)으로 참조한다.
+# "initial"은 첫 빌드 전 자리표시 값이라 실제 이미지가 없다.
+images:
+  - name: dangubi-cronjob
+    newName: ghcr.io/pika-chew/dangubi-cronjob
+    newTag: "initial"

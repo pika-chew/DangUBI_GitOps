@@ -19,7 +19,7 @@ spec:
           restartPolicy: Never
           containers:
           - name: score
-            image: dangubi-batch
+            image: dangubi-cronjob
             args:
             - --spring.batch.job.name=scoreJob
             envFrom:

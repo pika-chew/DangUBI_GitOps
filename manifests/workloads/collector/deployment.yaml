@@ -26,8 +26,12 @@ spec:
       # 파드 교체 시 진행 중인 요청을 마무리할 시간(초). 
       # 앱에 server.shutdown=graceful 설정이 있어야 효과가 있다.
       terminationGracePeriodSeconds: 30
+      # GHCR 비공개 이미지를 받기 위한 인증 Secret (ghcr-pull-externalsecret.yaml이 만든다).
+      imagePullSecrets:
+      - name: collector-ghcr-pull
       containers:
-      - image: dangubi-be-collector
+      # kustomization.yaml images의 name과 같은 값. 실제 주소·태그는 그쪽에서 바뀐다.
+      - image: dangubi-collector
         name: dangubi-be-collector
         ports:
         # 포트에 이름을 붙여 probe와 Service(targetPort: http)가 번호 대신 이름으로 가리키게 한다.
