@@ -3,14 +3,12 @@ kind: ConfigMap
 metadata:
   name: collector-config
 # 비밀이 아닌 Collector 설정. 키 이름은 DangUBI_Collector README의 환경 변수 표를 따른다.
-# TODO: 실제 값으로 채운다. 값이 비어 있으면 워커가 시작하자마자 종료된다.
+# 값이 비어 있으면 워커가 시작하자마자 종료된다.
 data:
   # SQS 알림을 받을 큐와 원본 S3 버킷
-  COLLECTOR_SQS_QUEUE_URL: "TODO"
-  COLLECTOR_S3_BUCKET: "TODO"
-  AWS_REGION: "TODO"
-  # 파일을 옮겨 둘 Swift 컨테이너와 Keystone v3 인증 정보(자격 증명은 collector-cloud-cred Secret)
-  COLLECTOR_SWIFT_CONTAINER: "TODO"
-  OS_AUTH_URL: "TODO"
-  OS_REGION_NAME: "TODO"
+  COLLECTOR_SQS_QUEUE_URL: https://sqs.ap-northeast-2.amazonaws.com/821527508076/ubi-dev-ingestion
+  COLLECTOR_S3_BUCKET: ubi-dev-processed-821527508076-ap-northeast-2
+  AWS_REGION: ap-northeast-2
+  # Keystone v3 인증 설정(Swift 컨테이너명·인증 URL·자격 증명은 collector-cloud-cred Secret)
+  OS_REGION_NAME: RegionOne
   OS_INTERFACE: public

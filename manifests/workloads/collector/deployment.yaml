@@ -37,11 +37,11 @@ spec:
         ports:
         - name: http
           containerPort: 8080
-        # 비밀이 아닌 설정(SQS·S3·Swift 위치)은 ConfigMap에서 통째로 환경 변수로 받는다.
+        # 비밀이 아닌 설정(SQS·S3·리전)은 ConfigMap에서 통째로 환경 변수로 받는다.
         envFrom:
         - configMapRef:
             name: collector-config
-        # AWS·Swift 인증 정보. Secret의 키가 곧 환경 변수 이름이다(externalsecret.yaml의 collector-cloud-cred).
+        # AWS·Swift 인증 정보와 Swift 컨테이너명·인증 URL. Secret의 키가 곧 환경 변수 이름이다(externalsecret.yaml의 collector-cloud-cred).
         - secretRef:
             name: collector-cloud-cred
         resources:
