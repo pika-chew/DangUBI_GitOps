@@ -41,6 +41,9 @@ spec:
         envFrom:
         - configMapRef:
             name: collector-config
+        # AWS·Swift 인증 정보. Secret의 키가 곧 환경 변수 이름이다(externalsecret.yaml의 collector-cloud-cred).
+        - secretRef:
+            name: collector-cloud-cred
         env:
         # DB 계정은 ExternalSecret이 만든 Secret에서 받는다. key는 externalsecret.yaml의 secretKey와 같아야 한다.
         - name: SPRING_DATASOURCE_USERNAME
