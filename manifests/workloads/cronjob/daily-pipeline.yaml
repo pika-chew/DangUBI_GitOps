@@ -34,6 +34,8 @@ spec:
                 name: batch-config
             - secretRef:
                 name: batch-db-cred
+            - secretRef:
+                name: batch-cloud-cred
             env:
             # JVM 힙을 메모리 limit의 75%로 맞춘다. 없으면 힙이 limit을 넘어 OOMKilled될 수 있다.
             - name: JAVA_TOOL_OPTIONS
