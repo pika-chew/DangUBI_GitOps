@@ -22,7 +22,7 @@ PVC만 생성한 시점의 `Pending`은 이 모드에서 반드시 오류를 의
 `cinder-retain`은 확장을 허용하지만 실제 Cinder 백엔드와 파일시스템의 지원 여부를 확인해야 한다.
 local PV의 용량 변경과 노드 간 데이터 이동은 자동 처리되지 않는다.
 
-공통 `cinder-retain`은 Cinder의 기본 볼륨 타입을 사용한다. MySQL의 cmp1 배치용 PVC는
+공통 `cinder-retain`은 `nova` AZ에 Cinder의 기본 볼륨 타입으로 볼륨을 생성한다. MySQL의 cmp1 배치용 PVC는
 `cinder-mysql-cmp1`을 사용해 Horizon에서 확인한 `lvm-os-cmp1` 타입을 요청한다.
 해당 타입의 `volume_backend_name`은 `lvm-os-cmp1`이다. 이 백엔드 이름을 사용하는 호스트가
 cmp1 하나인지 확인하고, 실제 생성된 볼륨의 호스트도 확인한다.
@@ -64,6 +64,17 @@ Secret 생성 예시는 GitOps 레포 루트를 기준으로 한다.
 Keystone 인증뿐 아니라 Nova·Cinder API 도달성과 실제 볼륨 조작 권한도 확인한다.
 자격 증명을 교체하면 controller와 node DaemonSet을 순차적으로 재시작한다.
 향후 HTTPS·사설 CA를 사용하면 CA 마운트와 `ca-file`을 함께 설정한다.
+
+다른 AZ의 Worker에서 `nova` 볼륨을 연결하려면 Nova의 `[cinder] cross_az_attach = true`가 필요하다.
+CSI의 `cloud.conf`에 아래 설정을 넣고 Secret을 갱신한 뒤 CSI controller를 재시작한다.
+
+```ini
+[BlockStorage]
+ignore-volume-az = true
+```
+
+이미 배포한 `cinder-retain`의 `parameters`는 Sync로 수정할 수 없다. 기존 PVC의 사용 현황을 확인한 뒤
+StorageClass만 같은 이름으로 재생성하고, 대기 중인 PVC의 프로비저닝 이벤트를 확인한다.
 
 ## 최초 동기화와 확인
 
@@ -114,7 +125,7 @@ Horizon에서 호스트가 표시되지 않으면 OpenStack 담당자에게 볼�
 
 `dangubi-mysql`은 MySQL Community `8.4.13` 3멤버와 Router 2개를 구성한다.
 멤버당 PVC는 `20Gi`로 시작한다. 0번은 `cinder-mysql-cmp1`, 나머지 두 멤버는 `cinder-retain`을 사용한다.
-`cinder-retain`을 사용하는 멤버의 실제 백엔드는 Cinder의 기본 정책에 따라 결정된다.
+`cinder-retain`을 사용하는 멤버의 볼륨은 `nova` AZ에 생성되며, 실제 백엔드는 Cinder의 기본 정책에 따라 결정된다.
 
 최초 동기화 전에 MySQL Operator, 두 StorageClass, `ClusterSecretStore/vault`가 준비됐는지 확인한다.
 Vault의 `ubi/mysql/root`에 `rootUser`, `rootPassword`를 준비한다.
