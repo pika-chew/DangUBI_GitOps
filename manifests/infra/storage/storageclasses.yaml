@@ -9,6 +9,7 @@ metadata:
     argocd.argoproj.io/sync-options: Prune=false,Delete=false
 provisioner: cinder.csi.openstack.org
 parameters:
+  availability: internal
   csi.storage.k8s.io/fstype: ext4
 reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
