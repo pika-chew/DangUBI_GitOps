@@ -1,5 +1,5 @@
 # Kafka Connect 클러스터(KafkaConnect), 커넥터(Debezium MySQL Source, MongoDB Sink),
-# 접속 정보 Secret을 만드는 ExternalSecret(debezium-cred, mongo-cred, ghcr-push)을 동기화한다.
+# 접속 정보 Secret을 만드는 ExternalSecret(debezium-cred, mongo-cred, ghcr-push, connect-ghcr-pull)을 동기화한다.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
