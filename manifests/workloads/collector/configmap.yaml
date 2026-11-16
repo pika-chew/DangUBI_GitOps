@@ -9,6 +9,5 @@ data:
   COLLECTOR_SQS_QUEUE_URL: https://sqs.ap-northeast-2.amazonaws.com/821527508076/ubi-dev-ingestion
   COLLECTOR_S3_BUCKET: ubi-dev-processed-821527508076-ap-northeast-2
   AWS_REGION: ap-northeast-2
-  # Keystone v3 인증 설정(Swift 컨테이너명·인증 URL·자격 증명은 collector-cloud-cred Secret)
   OS_REGION_NAME: RegionOne
   OS_INTERFACE: public
