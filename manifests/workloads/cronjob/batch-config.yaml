@@ -7,9 +7,7 @@ data:
   # 재처리할 파일을 이 큐에 다시 넣으면 Collector가 받아서 처리한다.
   S3_SOURCE_BUCKET: ubi-dev-processed-821527508076-ap-northeast-2
   SQS_REQUEUE_QUEUE_URL: https://sqs.ap-northeast-2.amazonaws.com/821527508076/ubi-dev-ingestion
-  # TODO: Swift s3api 주소와 컨테이너 이름을 채운다. 컨테이너는 Collector가 쓰는 것(Vault ubi/collector/swift container)과 같아야 한다.
-  SWIFT_ENDPOINT: ""
-  SWIFT_CONTAINER: ""
+  # SWIFT_ENDPOINT·SWIFT_CONTAINER는 batch-cloud-cred Secret(Vault ubi/batch/swift)에서 받는다.
   # SWIFT_REGION은 기본값(us-east-1)과 다를 때만 넣는다.
 kind: ConfigMap
 metadata:
