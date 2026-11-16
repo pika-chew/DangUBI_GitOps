@@ -110,6 +110,38 @@ cmp1 배치도 같은 절차로 확인하되 테스트 PVC에 `cinder-mysql-cmp1
 바인딩된 PV의 `spec.csi.volumeHandle`로 OpenStack 볼륨을 찾아 타입과 실제 백엔드 호스트를 확인한다.
 Horizon에서 호스트가 표시되지 않으면 OpenStack 담당자에게 볼륨 ID로 호스트 확인을 요청한다.
 
+## MySQL 멤버별 Cinder 볼륨
+
+`dangubi-mysql`은 MySQL Community `8.4.13` 3멤버와 Router 2개를 구성한다.
+멤버당 PVC는 `20Gi`로 시작한다. 0번은 `cinder-mysql-cmp1`, 나머지 두 멤버는 `cinder-retain`을 사용한다.
+`cinder-retain`을 사용하는 멤버의 실제 백엔드는 Cinder의 기본 정책에 따라 결정된다.
+
+최초 동기화 전에 MySQL Operator, 두 StorageClass, `ClusterSecretStore/vault`가 준비됐는지 확인한다.
+Vault의 `ubi/mysql/root`에 `rootUser`, `rootPassword`를 준비한다.
+동기화 시 External Secrets Operator가 `dangubi-data/dangubi-mysql-root` Secret을 먼저 만든다.
+기존 배포를 전환할 때는 현재 관리자 계정과 같은 값을 Vault에 등록한다. 초기화 이후 관리자 비밀번호 변경은
+MySQL 계정과 Vault 값을 함께 변경하는 절차가 필요하다.
+
+먼저 0번 멤버의 PVC를 적용하고 클래스 이름을 확인한다.
+
+```sh
+kctl apply -f manifests/data/mysql/cmp1-pvc.yaml
+kctl -n dangubi-data get pvc datadir-dangubi-mysql-0 \
+  -o jsonpath='{.spec.storageClassName}{"\n"}'
+```
+
+`cinder-mysql-cmp1`이 출력되면 Argo CD에서 `dangubi-mysql`을 수동 동기화한다.
+`WaitForFirstConsumer`이므로 동기화 전 PVC가 `Pending`이어도 다음 단계로 진행한다.
+동기화 후 PVC 3개가 `Bound`인지, 0번 볼륨의 실제 백엔드가 cmp1인지 확인한다.
+
+```sh
+kctl -n dangubi-data get innodbcluster,pvc,pod
+kctl -n dangubi-data get service mysql-router
+```
+
+클러스터 상태가 ONLINE이고 세 멤버가 모두 온라인인지 확인한다. 애플리케이션과 Debezium은
+`mysql-router.dangubi-data.svc.cluster.local:3306`을 사용한다. Debezium 계정과 `ubi.outbox`는 연동 단계에서 준비한다.
+
 ## Kafka local PV 준비와 확인
 
 Kafka는 `local-kafka`의 `10Gi` PVC를 3개 요청한다. `k8s-worker-2`·`k8s-worker-3`·`k8s-worker-4`의
@@ -139,22 +171,87 @@ kctl get pv -l app.kubernetes.io/component=kafka
 kctl -n dangubi-data get pvc,pod -l strimzi.io/cluster=dangubi-kafka -o wide
 ```
 
-## MongoDB local PV 준비와 확인
+## MongoDB Replica Set과 로컬 PV
 
-`k8s-worker-1`·`k8s-worker-2`·`k8s-worker-4`의 `/mnt/data/mongodb`를 각각 PV 하나에 연결한다.
-MongoDB를 배포할 때는 멤버별 PVC의 `storageClassName`을 `local-mongodb`, 요청 용량을 `20Gi`로 맞춘다.
-`20Gi`는 초기 검증용 PVC 매칭 용량이며, 공유 OS 디스크의 실제 사용량은 제한하지 않는다.
+`dangubi-mongodb`는 Percona Operator가 관리하는 비샤딩 Replica Set이다.
+Operator가 `rs0` 멤버 3개, Headless Service, 내부 인증 정보와 DB 계정을 구성한다.
+각 멤버에는 `local-mongodb` StorageClass의 20Gi PVC 하나를 연결한다.
+20Gi는 PVC 매칭 용량이며 공유 OS 디스크의 실제 사용량을 제한하지 않는다.
 
-동기화 전에 노드의 `kubernetes.io/hostname` 라벨과 `Ready` 상태를 확인한다.
-각 Worker에 MongoDB 전용 디렉터리를 준비하고, 배포에 사용할 이미지의 실행 UID·GID와 Pod 보안 설정에
-맞춰 쓰기 권한을 설정한다. Kafka가 함께 배치된 Worker 2·4에서는 두 서비스의 디스크 사용량을 함께 확인한다.
+동기화 전에 [Operator와 CRD가 준비됐는지](bootstrap.md#mongodb-operator) 확인한다.
+`dangubi-storage` 동기화 후 MongoDB PV 3개와 Worker의 `Ready` 상태를 확인한다.
 
 ```sh
 kctl get nodes k8s-worker-1 k8s-worker-2 k8s-worker-4 -L kubernetes.io/hostname
-kctl get pv -l app.kubernetes.io/component=mongodb
+kctl get pv -l app.kubernetes.io/component=mongodb -o wide
 ```
 
-MongoDB를 배포한 후 멤버별 PVC가 각각 다른 PV에 바인딩되고, 데이터 디렉터리에 쓰기가 가능한지 확인한다.
+세 Worker에 새 MongoDB 전용 경로를 준비한다. Percona의 실행 UID와 볼륨 접근 그룹은 1001이다.
+이미 경로가 있으면 기존 데이터와 소유권을 먼저 확인한다.
+
+```sh
+sudo install -d -o 1001 -g 1001 -m 0750 /mnt/data/mongodb
+stat -c '%n %u:%g %a' /mnt/data/mongodb
+df -hT /mnt/data/mongodb
+```
+
+기존 직접 관리 StatefulSet을 이미 배포한 환경은 PVC 이름, Replica Set 이름과 멤버 주소가
+달라진다. 기존 볼륨에 데이터가 있다면 백업·복원 또는 데이터 이전 절차를 마련한 후 전환한다.
+아래는 신규 배포 절차다.
+
+### 최초 동기화와 앱 접속
+
+동기화 전에 `ClusterSecretStore/vault`가 준비됐는지 확인하고 아래 값을 Vault에 등록한다.
+
+Vault UI의 `ubi` 마운트 안에서 `mongodb/system-users`를 생성한다.
+시스템 계정마다 아래 사용자명과 서로 다른 비밀번호를 등록한다.
+
+| 계정 | 사용자명 필드 | 비밀번호 필드 |
+| --- | --- | --- |
+| 백업·복구 (`backup`) | `MONGODB_BACKUP_USER` | `MONGODB_BACKUP_PASSWORD` |
+| 클러스터 관리자 (`clusterAdmin`) | `MONGODB_CLUSTER_ADMIN_USER` | `MONGODB_CLUSTER_ADMIN_PASSWORD` |
+| 모니터링 (`clusterMonitor`) | `MONGODB_CLUSTER_MONITOR_USER` | `MONGODB_CLUSTER_MONITOR_PASSWORD` |
+| DB 관리자 (`databaseAdmin`) | `MONGODB_DATABASE_ADMIN_USER` | `MONGODB_DATABASE_ADMIN_PASSWORD` |
+| 사용자 관리자 (`userAdmin`) | `MONGODB_USER_ADMIN_USER` | `MONGODB_USER_ADMIN_PASSWORD` |
+
+앱 계정은 다음 Vault 경로에 등록한다.
+
+| Vault 경로 | 필드 | MongoDB 계정 |
+| --- | --- | --- |
+| `ubi/kafka-connect/mongo` | `password` | `ubi_sink` (`readWrite`) |
+| `ubi/query/mongo` | `password` | `ubi_query` (`read`) |
+
+이전 설정에서 `uri`만 사용했다면 배포 전에 각 경로에 `password` 필드를 추가한다.
+기존 MongoDB 계정이 있다면 전환 시 현재 사용 중인 비밀번호를 등록한다.
+
+Argo CD에서 `dangubi-mongodb`를 수동 동기화한다. Operator가 Replica Set을 초기화하므로
+`rs.initiate()`와 수동 keyfile 생성 절차는 생략한다. `PerconaServerMongoDB` 상태가 `ready`인지,
+StatefulSet과 PVC 3개가 준비됐는지 확인한다.
+
+```sh
+kctl -n dangubi-data get externalsecret dangubi-mongodb-system-users dangubi-mongodb-app-passwords
+kctl -n dangubi-data get psmdb dangubi-mongodb
+kctl -n dangubi-data get statefulset dangubi-mongodb-rs0
+kctl -n dangubi-data get pvc,pod -o wide
+```
+
+ESO가 `dangubi-mongodb-system-users`와 `dangubi-mongodb-app-passwords` Secret을 먼저 생성한다.
+Percona Operator는 전자로 시스템 계정을 초기화하고 후자로 `ubi_read`의 앱 계정을 구성한다.
+Replica Set 멤버 간 인증에 사용하는 keyfile은 Percona Operator가 관리한다.
+기존 MongoDB 데이터를 복원할 때는 복구할 DB의 계정 정보와 Vault 값이 일치해야 한다.
+Kafka Connect와 Query API의 ExternalSecret은 같은 Vault 비밀번호에 URL 인코딩을 적용해 각자 접속 URI를 만든다.
+Sink는 `dangubi-data/mongo-cred`의 `uri`를, Query API는 `dangubi/query-mongo-cred`의
+`SPRING_DATA_MONGODB_URI`를 사용한다.
+
+`tls.mode: preferTLS`는 멤버 간 TLS를 사용하며, 기존 인증서 미탑재 클라이언트는 아래처럼
+내부 주소로 SCRAM 접속할 수 있다. TLS를 사용하는 클라이언트에는 Operator가 생성한 URI와
+접속에 필요한 CA·클라이언트 인증서를 제공한다.
+
+```text
+mongodb://ubi_sink:<URL 인코딩한 비밀번호>@dangubi-mongodb-rs0.dangubi-data.svc.cluster.local:27017/ubi_read?replicaSet=rs0&authSource=ubi_read&tls=false
+```
+
+실제 URI와 비밀번호는 Git에 기록하지 않는다.
 
 ## 로컬 검증
 
@@ -167,6 +264,7 @@ helm lint .cache/openstack-cinder-csi --kube-version 1.36.5 \
 helm template cinder-csi .cache/openstack-cinder-csi \
   --namespace kube-system --kube-version 1.36.5 --values helm/cinder-csi/values.yaml
 kubectl kustomize manifests/infra/storage
+kubectl kustomize manifests/data/mongodb
 git diff --check
 ```
 

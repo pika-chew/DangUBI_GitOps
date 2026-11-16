@@ -12,6 +12,8 @@ spec:
     - https://metallb.github.io/metallb
     - https://charts.external-secrets.io
     - https://argoproj.github.io/argo-helm
+    - https://mysql.github.io/mysql-operator/
+    - https://percona.github.io/percona-helm-charts/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: kube-system
@@ -21,6 +23,8 @@ spec:
       namespace: argo-rollouts
     - server: https://kubernetes.default.svc
       namespace: external-secrets
+    - server: https://kubernetes.default.svc
+      namespace: mysql-operator
     - server: https://kubernetes.default.svc
       namespace: dangubi-data
     - server: https://kubernetes.default.svc
