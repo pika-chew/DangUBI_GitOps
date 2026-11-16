@@ -11,6 +11,9 @@ spec:
   updateStrategy: SmartUpdate # 변경 적용시 Secondary 부터 교체하고 Primary를 나중에 교체
   upgradeOptions:
     apply: disabled # Operator가 DB 버전을 자동으로 올리지 못하게
+  secrets:
+    # 시스템 계정은 ESO가 Vault에서 동기화한 Secret으로 초기화한다.
+    users: dangubi-mongodb-system-users
   tls:
     # 내부 복제에는 TLS를 사용하고 기존 클라이언트의 SCRAM 접속도 허용한다.
     mode: preferTLS

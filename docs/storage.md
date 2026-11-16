@@ -203,6 +203,19 @@ df -hT /mnt/data/mongodb
 
 동기화 전에 `ClusterSecretStore/vault`가 준비됐는지 확인하고 아래 값을 Vault에 등록한다.
 
+Vault UI의 `ubi` 마운트 안에서 `mongodb/system-users`를 생성한다.
+시스템 계정마다 아래 사용자명과 서로 다른 비밀번호를 등록한다.
+
+| 계정 | 사용자명 필드 | 비밀번호 필드 |
+| --- | --- | --- |
+| 백업·복구 (`backup`) | `MONGODB_BACKUP_USER` | `MONGODB_BACKUP_PASSWORD` |
+| 클러스터 관리자 (`clusterAdmin`) | `MONGODB_CLUSTER_ADMIN_USER` | `MONGODB_CLUSTER_ADMIN_PASSWORD` |
+| 모니터링 (`clusterMonitor`) | `MONGODB_CLUSTER_MONITOR_USER` | `MONGODB_CLUSTER_MONITOR_PASSWORD` |
+| DB 관리자 (`databaseAdmin`) | `MONGODB_DATABASE_ADMIN_USER` | `MONGODB_DATABASE_ADMIN_PASSWORD` |
+| 사용자 관리자 (`userAdmin`) | `MONGODB_USER_ADMIN_USER` | `MONGODB_USER_ADMIN_PASSWORD` |
+
+앱 계정은 다음 Vault 경로에 등록한다.
+
 | Vault 경로 | 필드 | MongoDB 계정 |
 | --- | --- | --- |
 | `ubi/kafka-connect/mongo` | `password` | `ubi_sink` (`readWrite`) |
@@ -216,13 +229,16 @@ Argo CD에서 `dangubi-mongodb`를 수동 동기화한다. Operator가 Replica S
 StatefulSet과 PVC 3개가 준비됐는지 확인한다.
 
 ```sh
+kctl -n dangubi-data get externalsecret dangubi-mongodb-system-users dangubi-mongodb-app-passwords
 kctl -n dangubi-data get psmdb dangubi-mongodb
 kctl -n dangubi-data get statefulset dangubi-mongodb-rs0
 kctl -n dangubi-data get pvc,pod -o wide
 ```
 
-ESO가 `dangubi-data/dangubi-mongodb-app-passwords`를 먼저 생성하고, Percona Operator는
-이 Secret을 읽어 `ubi_read` DB의 두 계정을 구성한다. 클러스터의 시스템 계정과 내부 인증 키는 Operator가 관리한다.
+ESO가 `dangubi-mongodb-system-users`와 `dangubi-mongodb-app-passwords` Secret을 먼저 생성한다.
+Percona Operator는 전자로 시스템 계정을 초기화하고 후자로 `ubi_read`의 앱 계정을 구성한다.
+Replica Set 멤버 간 인증에 사용하는 keyfile은 Percona Operator가 관리한다.
+기존 MongoDB 데이터를 복원할 때는 복구할 DB의 계정 정보와 Vault 값이 일치해야 한다.
 Kafka Connect와 Query API의 ExternalSecret은 같은 Vault 비밀번호에 URL 인코딩을 적용해 각자 접속 URI를 만든다.
 Sink는 `dangubi-data/mongo-cred`의 `uri`를, Query API는 `dangubi/query-mongo-cred`의
 `SPRING_DATA_MONGODB_URI`를 사용한다.
