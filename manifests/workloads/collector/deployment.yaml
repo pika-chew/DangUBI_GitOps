@@ -45,17 +45,6 @@ spec:
         - secretRef:
             name: collector-cloud-cred
         env:
-        # DB 계정은 ExternalSecret이 만든 Secret에서 받는다. key는 externalsecret.yaml의 secretKey와 같아야 한다.
-        - name: SPRING_DATASOURCE_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: collector-mysql-cred
-              key: username
-        - name: SPRING_DATASOURCE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: collector-mysql-cred
-              key: password
         # JVM 힙을 메모리 limit의 75%로 맞춘다. 없으면 힙이 limit을 넘어 OOMKilled될 수 있다.
         - name: JAVA_TOOL_OPTIONS
           value: -XX:MaxRAMPercentage=75
