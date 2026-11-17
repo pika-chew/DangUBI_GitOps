@@ -38,4 +38,5 @@ patches:
 images:
   - name: dangubi-cronjob
     newName: ghcr.io/pika-chew/dangubi-cronjob
-    newTag: "initial"
+    newTag: "b2c7b91"
+    digest: sha256:00eedecbb1842b9d8c06be956244c25a9302924c1a234aaddc067fdc93be16f9
