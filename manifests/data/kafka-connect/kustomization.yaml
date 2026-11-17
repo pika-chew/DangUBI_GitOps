@@ -4,6 +4,9 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # AppProject dangubi-data가 허용하는 네임스페이스. Strimzi 오퍼레이터도 이 네임스페이스만 감시한다.
+# [Connect 이동] 채울 것: dangubi-connect로 바꾸고 위 주석도 고친다.
+# 이 폴더의 리소스(ExternalSecret 4개, Role·RoleBinding, KafkaConnect, KafkaConnector 2개)가 모두 함께 옮겨진다.
+# KafkaConnector는 KafkaConnect와 같은 네임스페이스에 있어야 Strimzi가 찾는다.
 namespace: dangubi-data
 
 # 적용 순서는 각 파일의 sync-wave가 정한다. 

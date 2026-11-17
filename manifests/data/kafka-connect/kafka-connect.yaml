@@ -11,6 +11,8 @@ spec:
   version: 4.3.1
   # 1대가 죽으면 남은 워커로 태스크가 재배정된다.
   replicas: 2
+  # [Connect 이동] 채울 것: Kafka가 dangubi-data에 남으므로 짧은 이름이 풀리지 않는다.
+  # 네임스페이스를 붙인 주소(dangubi-kafka-kafka-bootstrap.dangubi-data.svc:9092)로 바꾼다.
   bootstrapServers: dangubi-kafka-kafka-bootstrap:9092
 
   # Connect 클러스터 식별자와 내부 토픽.
@@ -40,6 +42,9 @@ spec:
     -Xms: 768m
     -Xmx: 768m
 
+  # [Connect 이동] 채울 것: template.buildContainer.securityContext.privileged: true
+  # - Buildah가 레이어를 풀 때 / remount(CAP_SYS_ADMIN)가 필요하다. 워커(pod·connectContainer)에는 주지 않는다.
+  # - 필드 확인: kubectl explain kafkaconnect.spec.template.buildContainer.securityContext
   template:
     pod:
       # GHCR 비공개 이미지를 받기 위한 인증 Secret (ghcr-pull-externalsecret.yaml이 만든다).
@@ -58,6 +63,7 @@ spec:
 
   # Strimzi가 플러그인을 넣은 Connect 이미지를 직접 빌드해 GHCR에 push하고, push된 digest로 pull한다.
   build:
+    # [Connect 이동] 채울 것: 아래 주석의 quota 이름을 dangubi-connect로 고친다(값은 그대로).
     # 필수: dangubi-data ResourceQuota 때문에 requests·limits가 없으면 빌드 파드가 생성되지 않는다.
     # 이미지를 만드는 동안만 잠깐 뜨는 파드라 넉넉히 잡는다.
     resources:

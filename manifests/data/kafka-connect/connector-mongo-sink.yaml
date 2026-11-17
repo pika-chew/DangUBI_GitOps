@@ -15,6 +15,8 @@ spec:
   autoRestart:
     enabled: true
   config:
+    # [Connect 이동] 채울 것: ${secrets:<네임스페이스>/...}의 네임스페이스를 dangubi-connect로.
+    # URI 안의 MongoDB 주소는 이미 FQDN(externalsecrets.yaml)이라 그대로 둔다.
     # 값은 Secret mongo-cred에서 읽는다(Vault → ExternalSecret).
     connection.uri: ${secrets:dangubi-data/mongo-cred:uri}
     database: ubi_read
