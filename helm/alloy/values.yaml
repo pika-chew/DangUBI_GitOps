@@ -498,7 +498,8 @@ alloy:
         //   I = info, W = warn, E = error, F = fatal(critical)
         // Loki는 레벨 정보가 없으면 줄 안의 단어("Error" 등)로 추측해 W 줄을 error로 잘못 분류한다.
         // 첫 글자로 detected_level을 직접 붙인다. 이 값이 있으면 Loki는 추측하지 않는다.
-        // 이 설정은 Helm tpl을 거치므로 Go 템플릿({{ }}) 대신 레벨마다 match + 고정값을 쓴다.
+        // 이 설정은 Helm tpl을 거치므로 Go 템플릿 문법(이중 중괄호) 대신 레벨마다 match + 고정값을 쓴다.
+        // 주석 안에서도 이중 중괄호를 쓰면 Helm이 템플릿으로 해석해 렌더링이 실패한다.
         stage.match {
           selector = `{namespace="kube-system"} |~ "^I[0-9]{4} "`
           stage.template {
