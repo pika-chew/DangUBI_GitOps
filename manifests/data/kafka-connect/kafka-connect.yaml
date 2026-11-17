@@ -42,7 +42,7 @@ spec:
     -Xmx: 768m
 
   template:
-    # Buildah가 레이어를 풀 때 /를 remount해야 해서 빌드 컨테이너만 privileged로 띄운다. 워커에는 주지 않는다.
+    # Buildah가 레이어를 풀 때 /를 remount해야 해서 빌드 컨테이너만 privileged로 띄운다.
     buildContainer:
       securityContext:
         privileged: true

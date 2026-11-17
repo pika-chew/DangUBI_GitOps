@@ -3,7 +3,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# 빌드 파드(Buildah)에 privileged가 필요해 DB가 있는 dangubi-data와 분리했다.
 namespace: dangubi-connect
 
 # 적용 순서는 각 파일의 sync-wave가 정한다. 
