@@ -29,6 +29,8 @@ spec:
       namespace: dangubi-data
     - server: https://kubernetes.default.svc
       namespace: dangubi
+    - server: https://kubernetes.default.svc
+      namespace: dangubi-connect
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

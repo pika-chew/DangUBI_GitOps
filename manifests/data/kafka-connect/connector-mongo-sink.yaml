@@ -16,7 +16,7 @@ spec:
     enabled: true
   config:
     # 값은 Secret mongo-cred에서 읽는다(Vault → ExternalSecret).
-    connection.uri: ${secrets:dangubi-data/mongo-cred:uri}
+    connection.uri: ${secrets:dangubi-connect/mongo-cred:uri}
     database: ubi_read
     topics: outbox.vehicle_summary,outbox.trip_score,outbox.monthly_premium
     # 토픽마다 저장할 컬렉션을 지정한다.

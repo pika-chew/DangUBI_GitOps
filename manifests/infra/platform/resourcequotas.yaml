@@ -13,6 +13,20 @@ spec:
     requests.memory: 40Gi
     limits.memory: 48Gi
 ---
+# 워커 2대 + 빌드 파드가 동시에 떠도 들어가고, 롤링 중 워커 1대가 더 겹칠 여유를 둔다.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dangubi-connect-compute
+  namespace: dangubi-connect
+  labels:
+    app.kubernetes.io/part-of: dangubi
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 6Gi
+    limits.memory: 8Gi
+---
 apiVersion: v1
 kind: ResourceQuota
 metadata:
