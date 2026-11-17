@@ -27,6 +27,8 @@ spec:
                 name: batch-config
             - secretRef:
                 name: batch-db-cred
+            - secretRef:
+                name: batch-cloud-cred
             env:
             - name: JAVA_TOOL_OPTIONS
               value: -XX:MaxRAMPercentage=75
