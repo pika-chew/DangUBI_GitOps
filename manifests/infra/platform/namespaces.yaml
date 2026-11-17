@@ -21,6 +21,21 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: dangubi-connect
+  labels:
+    app.kubernetes.io/part-of: dangubi
+    # Strimzi 빌드 파드(Buildah)는 레이어를 풀 때 /를 remount해야 해서 privileged가 필요하다.
+    # DB가 있는 dangubi-data 대신 Connect만 이 네임스페이스에 두어 특권 범위를 좁힌다.
+    pod-security.kubernetes.io/enforce: privileged
+    # 빌드 파드 외의 특권 파드가 생기면 드러나도록 경고·감사는 baseline 기준으로 둔다.
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: metallb-system
   labels:
     app.kubernetes.io/part-of: dangubi

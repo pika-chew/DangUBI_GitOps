@@ -27,4 +27,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: dangubi-connect-connect
-    namespace: dangubi-data
+    namespace: dangubi-connect

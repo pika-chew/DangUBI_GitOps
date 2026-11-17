@@ -11,7 +11,8 @@ spec:
   version: 4.3.1
   # 1대가 죽으면 남은 워커로 태스크가 재배정된다.
   replicas: 2
-  bootstrapServers: dangubi-kafka-kafka-bootstrap:9092
+  # Kafka는 dangubi-data에 있다.
+  bootstrapServers: dangubi-kafka-kafka-bootstrap.dangubi-data.svc:9092
 
   # Connect 클러스터 식별자와 내부 토픽.
   groupId: dangubi-connect
@@ -41,6 +42,10 @@ spec:
     -Xmx: 768m
 
   template:
+    # Buildah가 레이어를 풀 때 /를 remount해야 해서 빌드 컨테이너만 privileged로 띄운다.
+    buildContainer:
+      securityContext:
+        privileged: true
     pod:
       # GHCR 비공개 이미지를 받기 위한 인증 Secret (ghcr-pull-externalsecret.yaml이 만든다).
       # pushSecret은 빌드 push에만 쓰이므로 워커 pull 인증은 따로 붙인다.
@@ -58,7 +63,7 @@ spec:
 
   # Strimzi가 플러그인을 넣은 Connect 이미지를 직접 빌드해 GHCR에 push하고, push된 digest로 pull한다.
   build:
-    # 필수: dangubi-data ResourceQuota 때문에 requests·limits가 없으면 빌드 파드가 생성되지 않는다.
+    # 필수: dangubi-connect ResourceQuota 때문에 requests·limits가 없으면 빌드 파드가 생성되지 않는다.
     # 이미지를 만드는 동안만 잠깐 뜨는 파드라 넉넉히 잡는다.
     resources:
       requests:
