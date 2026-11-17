@@ -21,11 +21,9 @@ spec:
     # 서비스 이름과 포트(X 프로토콜 포트가 아닌 RW 클래식 포트)는 MySQL 담당과 확인이 필요하다.
     database.hostname: mysql-router.dangubi-data.svc.cluster.local
     database.port: 3306
-    # [Connect 이동] 채울 것: ${secrets:<네임스페이스>/...}의 네임스페이스를 dangubi-connect로.
-    # Secret은 ExternalSecret과 함께 dangubi-connect에 만들어진다. database.hostname은 이미 FQDN이라 그대로 둔다.
     # 값은 Secret debezium-cred에서 읽는다(Vault → ExternalSecret).
-    database.user: ${secrets:dangubi-data/debezium-cred:username}
-    database.password: ${secrets:dangubi-data/debezium-cred:password}
+    database.user: ${secrets:dangubi-connect/debezium-cred:username}
+    database.password: ${secrets:dangubi-connect/debezium-cred:password}
     database.server.id: 5401
     topic.prefix: dangubi
     database.include.list: ubi
@@ -36,9 +34,8 @@ spec:
     include.schema.changes: false
     tombstones.on.delete: false
 
-    # [Connect 이동] 채울 것: bootstrap.servers를 KafkaConnect와 같은 FQDN 주소로.
     # 커넥터 재시작 때 스키마를 복원하는 DDL 이력 저장소.
-    schema.history.internal.kafka.bootstrap.servers: dangubi-kafka-kafka-bootstrap:9092
+    schema.history.internal.kafka.bootstrap.servers: dangubi-kafka-kafka-bootstrap.dangubi-data.svc:9092
     schema.history.internal.kafka.topic: dangubi.schema-history
     # 구독하는 테이블(outbox)의 DDL만 저장해 이력을 작게 유지한다.
     schema.history.internal.store.only.captured.tables.ddl: true

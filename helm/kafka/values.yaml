@@ -8,11 +8,9 @@
 # - 그래서 Strimzi 업그레이드는 apps/data/kafka.yaml의 targetRevision만 바꾸면 된다. (skipCrds는 켜지 않는다)
 
 
-# 비워 두면 오퍼레이터가 설치된 네임스페이스(dangubi-data)만 감시한다.
-# [Connect 이동] 채울 것: dangubi-connect 추가. 설치 네임스페이스(dangubi-data)는 목록에 없어도 계속 감시한다.
-# - chart가 이 네임스페이스에 오퍼레이터용 RoleBinding을 만든다 → Namespace가 먼저 있어야 한다(platform 앱, infra 단계라 먼저 뜬다).
-# - 위 주석도 함께 고친다.
-watchNamespaces: []
+# 설치 네임스페이스(dangubi-data)에 더해 Kafka Connect가 있는 dangubi-connect도 감시한다.
+watchNamespaces:
+  - dangubi-connect
 
 # 클러스터 전체 감시는 모든 네임스페이스에 대한 권한이 필요해 범위가 너무 크다.
 watchAnyNamespace: false

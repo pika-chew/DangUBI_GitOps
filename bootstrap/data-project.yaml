@@ -16,12 +16,12 @@ spec:
     - https://strimzi.io/charts/
 
   destinations:
-    # Strimzi 오퍼레이터, Kafka, Kafka Connect, MySQL, MongoDB가 모두 dangubi-data에 배포된다.
+    # Strimzi 오퍼레이터, Kafka, MySQL, MongoDB
     - server: https://kubernetes.default.svc
       namespace: dangubi-data
-    # [Connect 이동] 채울 것: dangubi-connect 목적지 추가. 위 dangubi-data 설명 주석도 Connect만 따로 간다고 고친다.
-    # - kafka-connect 앱이 이 네임스페이스로 배포된다.
-    # - kafka 앱의 Strimzi chart도 watchNamespaces에 넣은 네임스페이스에 RoleBinding을 만들므로 이 목적지가 필요하다.
+    # Kafka Connect (빌드 파드에 privileged가 필요해 분리). Strimzi chart의 RoleBinding도 여기에 생긴다.
+    - server: https://kubernetes.default.svc
+      namespace: dangubi-connect
 
   clusterResourceWhitelist:
     # Strimzi chart가 Kafka, KafkaNodePool, KafkaTopic, KafkaConnect, KafkaConnector 등의 CRD를 설치한다.

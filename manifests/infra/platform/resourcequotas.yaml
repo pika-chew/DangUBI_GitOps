@@ -13,19 +13,19 @@ spec:
     requests.memory: 40Gi
     limits.memory: 48Gi
 ---
-# dangubi-connect-compute (ResourceQuota)
-# - 역할: dangubi-connect의 CPU·메모리 상한. quota가 있으면 빌드 파드를 포함한 모든 컨테이너에 requests·limits.memory가 필수다.
-# - 초안: kubectl create quota dangubi-connect-compute -n dangubi-connect --hard=requests.cpu=<값>,requests.memory=<값>,limits.memory=<값> --dry-run=client -o yaml
-#   - 생성 후 고칠 것: status: {}, creationTimestamp: null 지우기. labels(part-of: dangubi) 추가
-# - 채울 것:
-#   - spec.hard: 워커 2대(요청 250m·1Gi, limit 1536Mi)와 빌드 파드(요청 500m·1Gi, limit 2Gi)가 동시에 떠도 들어가야 한다.
-#     최소 requests.cpu 1, requests.memory 3Gi, limits.memory 5Gi. 롤링 중 워커가 겹칠 여유를 더해 정한다.
-# - 정할 것: dangubi-data-compute에서 Connect 몫만큼 줄일지 (줄이지 않아도 동작한다)
+# 워커 2대 + 빌드 파드가 동시에 떠도 들어가고, 롤링 중 워커 1대가 더 겹칠 여유를 둔다.
 apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: dangubi-connect-compute
   namespace: dangubi-connect
+  labels:
+    app.kubernetes.io/part-of: dangubi
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 6Gi
+    limits.memory: 8Gi
 ---
 apiVersion: v1
 kind: ResourceQuota
