@@ -17,4 +17,5 @@ resources:
 images:
   - name: dangubi-collector
     newName: ghcr.io/pika-chew/dangubi-collector
-    newTag: "initial"
+    newTag: "b7ed3e4"
+    digest: sha256:0d5af39422c1b55fc049f24ecae274c027e8d601770ef74c9628eaa460a80bc0

@@ -415,6 +415,22 @@ alloy:
           target_label  = "app"
         }
 
+        // app.kubernetes.io/name이 없는 Pod는 다른 관례 라벨로 app을 채운다.
+        // k8s-app: CoreDNS·Calico 등 애드온 / component: static Pod(kube-apiserver·etcd 등)
+        rule {
+          source_labels = ["app", "__meta_kubernetes_pod_label_k8s_app"]
+          separator     = ";"
+          regex         = ";(.+)"
+          target_label  = "app"
+        }
+
+        rule {
+          source_labels = ["app", "__meta_kubernetes_pod_label_component"]
+          separator     = ";"
+          regex         = ";(.+)"
+          target_label  = "app"
+        }
+
         rule {
           source_labels = ["__meta_kubernetes_pod_node_name"]
           target_label  = "node"
@@ -425,6 +441,17 @@ alloy:
           source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
           separator     = "/"
           replacement   = "/var/log/pods/*$1/*.log"
+          target_label  = "__path__"
+        }
+
+        // static Pod(kube-apiserver·etcd·scheduler·controller-manager)는 API에 보이는 UID가
+        // mirror Pod의 것이라 실제 로그 폴더 이름(매니페스트 해시)과 다르다.
+        // config.hash annotation이 있으면 그 값으로 경로를 다시 만든다.
+        rule {
+          source_labels = ["__meta_kubernetes_pod_annotation_kubernetes_io_config_hash", "__meta_kubernetes_pod_container_name"]
+          separator     = "/"
+          regex         = "(.+)/(.+)"
+          replacement   = "/var/log/pods/*$1/$2/*.log"
           target_label  = "__path__"
         }
 
