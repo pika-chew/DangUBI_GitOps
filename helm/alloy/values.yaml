@@ -494,48 +494,6 @@ alloy:
           values = ["filename"]
         }
 
-        // K8s 구성 요소 로그(klog 형식)는 줄 맨 앞 글자가 레벨이다. 예: W1117 10:00:00.123456 1 file.go:12] ...
-        //   I = info, W = warn, E = error, F = fatal(critical)
-        // Loki는 레벨 정보가 없으면 줄 안의 단어("Error" 등)로 추측해 W 줄을 error로 잘못 분류한다.
-        // 첫 글자로 detected_level을 직접 붙인다. 이 값이 있으면 Loki는 추측하지 않는다.
-        // 이 설정은 Helm tpl을 거치므로 Go 템플릿({{ }}) 대신 레벨마다 match + 고정값을 쓴다.
-        stage.match {
-          selector = `{namespace="kube-system"} |~ "^I[0-9]{4} "`
-          stage.template {
-            source   = "detected_level"
-            template = "info"
-          }
-        }
-
-        stage.match {
-          selector = `{namespace="kube-system"} |~ "^W[0-9]{4} "`
-          stage.template {
-            source   = "detected_level"
-            template = "warn"
-          }
-        }
-
-        stage.match {
-          selector = `{namespace="kube-system"} |~ "^E[0-9]{4} "`
-          stage.template {
-            source   = "detected_level"
-            template = "error"
-          }
-        }
-
-        stage.match {
-          selector = `{namespace="kube-system"} |~ "^F[0-9]{4} "`
-          stage.template {
-            source   = "detected_level"
-            template = "critical"
-          }
-        }
-
-        // klog 형식이 아닌 줄(CoreDNS, Calico 등)은 값이 없어 붙지 않고, Loki가 기존대로 판단한다.
-        stage.structured_metadata {
-          values = { detected_level = "" }
-        }
-
         // 마스킹(vehicleId·좌표 등)과 trace_id 추출은 앱 로그 형식이 정해지면 여기에 추가한다.
       }
 
