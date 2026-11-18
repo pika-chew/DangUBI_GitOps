@@ -18,8 +18,8 @@ spec:
       backoffLimit: 2
       # 2시간이 넘으면 강제 종료
       activeDeadlineSeconds: 7200
-      # 끝난 Job과 파드를 하루 뒤 자동 삭제
-      ttlSecondsAfterFinished: 86400
+      # 끝난 Job과 파드를 1시간 뒤 자동 삭제
+      ttlSecondsAfterFinished: 3600
       template:
         spec:
           # 실패한 파드를 그 자리에서 재시작하지 않고 남겨 둔다(로그 확인용).
