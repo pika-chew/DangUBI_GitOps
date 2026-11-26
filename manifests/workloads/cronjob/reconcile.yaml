@@ -1,5 +1,5 @@
 # 테스트용 Job 틀: 정합성 검토(reconcileJob)만 따로 실행한다. 스케줄로는 돌지 않는다.
-# 직접 실행: kubectl -n dangubi create job --from=cronjob/reconcile reconcile-manual-$(date +%s)
+# 직접 실행: args에 targetDate=YYYY-MM-DD(UTC) 추가 (--from만으로는 필수 파라미터가 없어 실패)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
