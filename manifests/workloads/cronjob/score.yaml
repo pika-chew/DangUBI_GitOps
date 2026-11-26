@@ -1,10 +1,13 @@
 # 테스트용 Job 틀: 점수 계산(scoreJob)만 따로 실행한다. 스케줄로는 돌지 않는다.
 # 직접 실행: kubectl -n dangubi create job --from=cronjob/score score-manual-$(date +%s)
+# 테스트 기준: args에 --ubi.batch.score.basis=test 추가 (테스트 DB에서만. 운영 DB에 쓰면 구간이 섞인다)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: score
 spec:
+  # 스케줄로 실행하지 않는다.
+  # (1) suspend (2) 2/31 실행
   suspend: true
   schedule: "0 0 31 2 *"
   timeZone: Asia/Seoul
@@ -12,8 +15,10 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 0
+      # 2시간이 넘으면 강제 종료
       activeDeadlineSeconds: 7200
-      ttlSecondsAfterFinished: 86400
+      # 끝난 Job과 파드를 1시간 뒤 자동 삭제
+      ttlSecondsAfterFinished: 3600
       template:
         spec:
           restartPolicy: Never

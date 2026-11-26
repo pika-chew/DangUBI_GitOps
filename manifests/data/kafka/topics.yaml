@@ -51,6 +51,43 @@ spec:
     retention.ms: 604800000
     min.insync.replicas: 2
 ---
+# DangUBI_CronJob이 outbox에 남기는 aggregate_type별 토픽.
+# Event Router는 aggregate_type 값(enum 이름, 대문자)을 그대로 붙이므로 topicName도 대문자다.
+# metadata.name은 소문자만 쓸 수 있어 topicName으로 실제 이름을 지정한다.
+# ingestJob: TRIP_STARTED·TRIP_COMPLETED (key = trip id)
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: outbox.trip
+  labels:
+    strimzi.io/cluster: dangubi-kafka
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  topicName: outbox.TRIP
+  partitions: 3
+  replicas: 3
+  config:
+    retention.ms: 604800000
+    min.insync.replicas: 2
+---
+# scoreJob: VEHICLE_SCORE_REPORTED (key = vehicle_score_report id)
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: outbox.vehicle-score-report
+  labels:
+    strimzi.io/cluster: dangubi-kafka
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  topicName: outbox.VEHICLE_SCORE_REPORT
+  partitions: 3
+  replicas: 3
+  config:
+    retention.ms: 604800000
+    min.insync.replicas: 2
+---
 # Mongo Sink가 처리하지 못한 메시지를 보관하는 DLQ. 양이 적어 파티션 1개.
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
