@@ -1,10 +1,22 @@
 # 테스트용 Job 틀: 점수 계산(scoreJob)만 따로 실행한다. 스케줄로는 돌지 않는다.
 # 직접 실행: kubectl -n dangubi create job --from=cronjob/score score-manual-$(date +%s)
+# Job 파라미터는 받지 않는다(RunIdIncrementer가 매번 새 실행을 만든다). 운영 기준(standard, 125km/1,500km)으로 돈다.
+# 배포 전 운영 DB에 db/alter-score-job.sql → db/trip-schema-mysql.sql을 먼저 실행해야 한다(DangUBI_CronJob PR #15).
+#
+# 테스트 기준(test, 50km/600km) 실행: --from은 args를 바꿀 수 없어 YAML을 고쳐서 만든다.
+#   kubectl -n dangubi create job --from=cronjob/score score-test-$(date +%s) --dry-run=client -o json \
+#   | jq '.spec.template.spec.containers[0].args += ["--ubi.batch.score.basis=test"]' \
+#   | kubectl create -f -
+# [주의] test 기준은 테스트 DB에서만 쓴다. batch-config는 운영 DB를 가리키므로 그대로 돌리면
+#        50km 구간이 운영 score_segment에 섞이고 리포트·outbox 이벤트까지 나간다(되돌리려면 DB에서 직접 지워야 한다).
+#        테스트 DB가 있으면 jq에서 env에 SPRING_DATASOURCE_URL도 테스트 DB로 덮어쓴다. 없으면 로컬에서 실행한다.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: score
 spec:
+  # 스케줄로 실행하지 않는다.
+  # (1) suspend (2) 2/31 실행
   suspend: true
   schedule: "0 0 31 2 *"
   timeZone: Asia/Seoul
@@ -12,7 +24,9 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 0
+      # 2시간이 넘으면 강제 종료
       activeDeadlineSeconds: 7200
+      # 끝난 Job과 파드를 1시간 뒤 자동 삭제
       ttlSecondsAfterFinished: 3600
       template:
         spec:
