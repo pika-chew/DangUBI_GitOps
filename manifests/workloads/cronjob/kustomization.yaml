@@ -9,6 +9,8 @@ resources:
   - batch-externalsecret.yaml   # 공용 DB 계정
   - batch-cloud-externalsecret.yaml   # 공용 AWS·Swift 인증 정보
   - ghcr-pull-externalsecret.yaml   # GHCR 비공개 이미지 pull 계정
+  # sync 직전(PreSync) 훅
+  - db-init.yaml                # DB 스키마 초기화 (BATCH_* 메타 테이블 + 업무 테이블)
   # 스케줄 작업 (시간순)
   # db-backup·monthly-finalize·cleanup은 아직 spec이 없는 틀이라 동기화에서 뺀다.
   # spec(schedule·jobTemplate)이 없는 CronJob은 API 서버 검증에서 거부되고, 그러면 이 앱 전체 sync가 실패한다.
