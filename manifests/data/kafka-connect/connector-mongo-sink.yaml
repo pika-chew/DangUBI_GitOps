@@ -18,11 +18,18 @@ spec:
     # 값은 Secret mongo-cred에서 읽는다(Vault → ExternalSecret).
     connection.uri: ${secrets:dangubi-connect/mongo-cred:uri}
     database: ubi_read
-    topics: outbox.vehicle_summary,outbox.trip_score,outbox.monthly_premium
+    topics: outbox.vehicle_summary,outbox.trip_score,outbox.monthly_premium,outbox.TRIP,outbox.VEHICLE_SCORE_REPORT
     # 토픽마다 저장할 컬렉션을 지정한다.
     topic.override.outbox.vehicle_summary.collection: vehicle_summary
     topic.override.outbox.trip_score.collection: trip_score
     topic.override.outbox.monthly_premium.collection: monthly_premium
+    # CronJob outbox 이벤트는 payload에 _id가 없어 메시지마다 새 문서로 넣는다(재전송되면 중복 가능).
+    topic.override.outbox.TRIP.collection: trip_event
+    topic.override.outbox.TRIP.document.id.strategy: com.mongodb.kafka.connect.sink.processor.id.strategy.BsonOidStrategy
+    topic.override.outbox.TRIP.writemodel.strategy: com.mongodb.kafka.connect.sink.writemodel.strategy.InsertOneDefaultStrategy
+    topic.override.outbox.VEHICLE_SCORE_REPORT.collection: vehicle_score_report
+    topic.override.outbox.VEHICLE_SCORE_REPORT.document.id.strategy: com.mongodb.kafka.connect.sink.processor.id.strategy.BsonOidStrategy
+    topic.override.outbox.VEHICLE_SCORE_REPORT.writemodel.strategy: com.mongodb.kafka.connect.sink.writemodel.strategy.InsertOneDefaultStrategy
 
     key.converter: org.apache.kafka.connect.storage.StringConverter
     value.converter: org.apache.kafka.connect.json.JsonConverter
