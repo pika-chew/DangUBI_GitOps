@@ -58,4 +58,5 @@ spec:
     # 차량 id가 아니므로 같은 차량의 리포트끼리는 파티션이 다를 수 있다.
     transforms.outbox.table.field.event.key: aggregate_id
     transforms.outbox.table.expand.json.payload: true
-    transforms.outbox.table.fields.additional.placement: event_type:header:eventType
+    # event_type을 헤더와 본문 모두에 넣는다. 본문은 {"payload": {...}, "eventType": "..."}가 된다(Mongo Sink는 헤더를 저장하지 않음).
+    transforms.outbox.table.fields.additional.placement: event_type:header:eventType,event_type:envelope:eventType
